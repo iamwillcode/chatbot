@@ -300,7 +300,9 @@ class RetailSupportBotApp(QMainWindow):
         faq_scroll.setWidgetResizable(True)
         faq_widget = QWidget()
         self.faq_layout = QVBoxLayout(faq_widget)
-        self.faq_layout.addWidget(QLabel("Quick FAQ").setFont(QFont("Helvetica", 12, QFont.Bold)))
+        faq_title = QLabel("Quick FAQ")
+        faq_title.setFont(QFont("Helvetica", 12, QFont.Bold))
+        self.faq_layout.addWidget(faq_title)
         self.faq_buttons = []
         self.load_faq_buttons()
         faq_scroll.setWidget(faq_widget)
@@ -475,11 +477,20 @@ class RetailSupportBotApp(QMainWindow):
         self.tabs.addTab(documents_widget, "Documents")
 
     def load_faq_buttons(self):
+        # Clear existing buttons
         for btn in self.faq_buttons:
-            btn.deleteLater()
+            if btn is not None:
+                btn.deleteLater()
         self.faq_buttons = []
+        # Load FAQs and create buttons
         for faq in self.faq_table.all():
+            if not isinstance(faq, dict) or 'question' not in faq:
+                logger.warning(f"Invalid FAQ entry: {faq}")
+                continue
             btn = QPushButton(faq['question'])
+            if btn is None:
+                logger.error("Failed to create QPushButton for FAQ")
+                continue
             btn.clicked.connect(lambda checked, q=faq['question']: self.search_faq(q))
             self.faq_layout.addWidget(btn)
             self.faq_buttons.append(btn)
@@ -488,6 +499,9 @@ class RetailSupportBotApp(QMainWindow):
     def load_faq_list(self):
         self.faq_model.removeRows(0, self.faq_model.rowCount())
         for faq in self.faq_table.all():
+            if not isinstance(faq, dict) or 'id' not in faq or 'question' not in faq or 'answer' not in faq:
+                logger.warning(f"Invalid FAQ entry: {faq}")
+                continue
             question_item = QStandardItem(faq['question'])
             answer_item = QStandardItem(faq['answer'])
             question_item.setData(faq['id'], Qt.UserRole)
@@ -518,6 +532,7 @@ class RetailSupportBotApp(QMainWindow):
             item.setHidden(text.lower() not in item.text().lower() if text else False)
 
     def display_images(self, image_paths):
+        # Clear existing image widgets
         for widget in self.image_layout.children():
             if isinstance(widget, QLabel):
                 widget.deleteLater()
@@ -526,10 +541,13 @@ class RetailSupportBotApp(QMainWindow):
             try:
                 pixmap = QPixmap(path)
                 if pixmap.isNull():
-                    logger.error(f"Failed to load image {path}")
+                    logger.error(f"Failed to load image {path}: Invalid or corrupted image")
                     continue
                 scaled_pixmap = pixmap.scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 label = QLabel()
+                if label is None:
+                    logger.error(f"Failed to create QLabel for image {path}")
+                    continue
                 label.setPixmap(scaled_pixmap)
                 label.mousePressEvent = lambda event, p=path: self.open_image(p)
                 self.image_layout.addWidget(label)
