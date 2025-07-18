@@ -1,0 +1,7 @@
+{
+  "printer": ["printing", "print"],
+  "wifi": ["wireless", "internet", "network"],
+  "error": ["issue", "problem", "fault"],
+  "disconnect": ["drop", "lost", "cut"],
+  "password": ["passcode", "key"]
+}
