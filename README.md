@@ -100,93 +100,159 @@ No costly AI infrastructure or ongoing cloud fees.
 
 Prompt:
 
-Create a standalone Python application named suretail_support_bot.py using Tkinter for a knowledge base chatbot that feels conversational, fluid, and modern. The app must run on Python 3.13, be offline-compatible after initial setup, and use only open-source libraries: tinydb, fuzzywuzzy, python-Levenshtein, pdfplumber, python-docx, nltk, and pillow. The app should have the following features and design:
+Create a PyQt5 desktop application named `retail_support_bot.py` for an offline knowledge base chatbot, replicating the exact functionality of a previous app (artifact ID `e36e43a5-9416-4373-b075-263e17113549`). The app must support `.pdf`, `.docx`, and `.txt` files, use `PyMuPDF` (`fitz`) for PDF image extraction (no `poppler` or other external dependencies beyond Python packages), run offline after setup, and be compatible with Python 3.13. Use `PyQt5`, `tinydb`, `fuzzywuzzy`, `python-Levenshtein`, `pdfplumber`, `python-docx`, `nltk`, `pillow`, and `PyMuPDF` for document processing. Below are the requirements:
 
-Directory Structure:
+### Core Features
+1. **Chat Interface**:
+   - Use `QMainWindow` with minimum size 800x500, title "Retail Support Bot - Knowledge Base Chatbot".
+   - `QTabWidget` with 5 tabs: Chat, FAQ Management, Synonym Management, Chat History, Documents.
+   - Chat tab:
+     - Left sidebar (`QScrollArea`, width=200) with clickable FAQ buttons (`QPushButton`).
+     - Main area (`QVBoxLayout`):
+       - Filters (`QHBoxLayout`): `QComboBox` for tags (NLTK-generated), filetypes (“All”, “pdf”, “docx”, “txt”), `QCheckBox` for “Regex Search” and “Case Sensitive”, `QComboBox` for regex presets (“Custom”, “Email: \b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b”, “Phone: \b\d{3}-\d{3}-\d{4}\b”).
+       - Results (`QTextEdit`, read-only, `Helvetica 10`, height=10 lines, HTML with bolded keywords, line numbers for regex).
+       - Image gallery (`QScrollArea`, height=100, 80x80 thumbnails in `QHBoxLayout`).
+       - Chatbox (`QHBoxLayout`): `QLineEdit` (600px, `Helvetica 12`), Send/Clear `QPushButton`. Enter key triggers search.
+   - Responsive `QVBoxLayout`/`QHBoxLayout` to prevent text cutoff.
 
-text
+2. **Search**:
+   - Fuzzy search (`fuzzywuzzy`, threshold 70%) with synonym expansion (`synonyms.json`).
+   - Regex search with case-sensitive toggle and presets (via `QComboBox`).
+   - Filter by tags (`QComboBox`, top 5 NLTK words + filename) and filetype.
+   - Display results in `QTextEdit` with filename, score, tags, line numbers (regex only), bolded keywords.
+   - Show associated images in gallery, clickable to open zoomable `QDialog`.
 
+3. **Image Display/Zoom**:
+   - Extract images from PDFs (using `PyMuPDF`) and `.docx` (`python-docx`) to `images/` (`<uuid>_imgX.png`). No images from `.txt`.
+   - Display thumbnails in `QScrollArea` (`QLabel`, 80x80).
+   - Zoomable `QDialog` (600x400) with `QScrollArea`, `QLabel` for image, `QSlider` (50–200% zoom), mouse wheel zoom (0.5x–2x), and drag-to-pan.
 
+4. **Dark Mode**:
+   - Toggle via `QToolBar` action using QSS.
+   - Light theme: `#f4f4f9` background, `#007bff` buttons, `#ffffff` inputs.
+   - Dark theme: `#2d2d2d` background, `#1e90ff` buttons, `#3c3c3c` inputs.
+   - `Helvetica` fonts (10pt for `QTextEdit`/`QTreeView`, 11pt for `QWidget`, 12pt for titles/chatbox).
 
-support_bot/
-├── data/
-│   ├── knowledge_db.json    # Stores indexed paragraphs
-│   ├── support_bot_db.json  # Stores FAQs
-│   ├── synonyms.json        # Stores synonym groups
-├── docs/                    # For .pdf/.docx files
-├── images/                  # For extracted .docx images
-├── support_bot.py           # Main app
-├── chat_transcript.txt      # Exported chat history
-├── README.md
-Features:
+5. **Document Indexing**:
+   - Index `.pdf` (sentences >20 chars via `pdfplumber`), `.docx` (paragraphs via `python-docx`), `.txt` (lines) from `docs/` (batch) or `QFileDialog` (single).
+   - Generate tags using NLTK (`word_tokenize`, `stopwords`, top 5 words + filename).
+   - Store in `data/knowledge_db.json` with `filename`, `filetype` (“pdf”, “docx”, “txt”), `text`, `tags`, `image_paths`.
+   - Show `QProgressBar` in status bar for batch indexing.
+   - Check for duplicates with `QMessageBox` warning.
 
-Chat Interface:
-A large chat input box (Entry, width=80, font="Helvetica 12") at the bottom of the Chat tab, with Send and Clear buttons always visible (even in smaller windows, min size 800x500).
-Pressing Enter triggers the search.
-Results display in a scrollable text area (ScrolledText, height=10) with bolded keywords (font="Helvetica 10 bold") and grouped by filename (📄 filename headers).
-A scrollable FAQ sidebar (using Canvas) on the left for quick question buttons.
-Fuzzy Search:
-Use fuzzywuzzy for keyword matching (threshold 70%) with synonym expansion from synonyms.json.
-Highlight matched words in results (wrap with ** and bold in UI).
-Regex Search:
-Add a "Regex Search" checkbox to enable pattern-based search (e.g., log* matches “login,” “logout”).
-Handle invalid regex patterns with an error message.
-Highlight regex matches in results.
-Tag/Filetype Filtering:
-Dropdowns for tags (from document content/filenames, top 5 words via NLTK) and filetypes (“All,” “.pdf,” “.docx”).
-Filter results based on selected tag/filetype.
-Image Display:
-Extract images from .docx files (save to images/ with unique names, e.g., <uuid>_img0.png) during indexing.
-Display thumbnails (80x80) in a scrollable horizontal gallery (Canvas) below results.
-Click thumbnails to open full-size images in the default viewer.
-Dark Mode:
-Toggle between light (#f4f4f9 background, #007bff buttons) and dark (#2d2d2d background, #1e90ff buttons) themes via a “Toggle Dark/Light Mode” button.
-Update all widgets (frames, buttons, text, etc.) dynamically.
-Tabs:
-Chat: Search, filters, results, image gallery, chatbox.
-FAQ Management: Add/edit FAQs in a Treeview (columns: Question, Answer).
-Synonym Management: Add/edit comma-separated synonym groups in a Treeview.
-Chat History: List previous queries in a Treeview, clickable to re-run, with “Export Chat” and “Clear History” buttons.
-Documents: List indexed document names in a Treeview to prevent duplicates.
-Document Indexing:
-Index .pdf (via pdfplumber) and .docx files from docs/ or single uploads.
-Split PDFs into sentences (>20 chars) and DOCX into paragraphs.
-Generate tags using NLTK (word_tokenize, stopwords, top 5 words + filename words).
-Store in knowledge_db.json with filename, filetype, text, tags, and image paths.
-Prevent duplicate indexing by checking filenames.
-Offline Compatibility:
-Use local storage (knowledge_db.json, support_bot_db.json, synonyms.json).
-Require NLTK data (punkt, stopwords) downloaded once.
-UI Design:
+6. **FAQ Management**:
+   - `QTreeView` with `QStandardItemModel` (`question`, `answer` columns, 300px/400px).
+   - Add/edit/delete FAQs (`QLineEdit` for inputs, `QPushButton` for add, context menu for edit/delete).
+   - Store in `data/support_bot_db.json`.
 
-Layout: Responsive with grid/pack, weight=1 for scaling, 10px padding.
-Typography: Helvetica fonts (10/11/12 for body/labels/headers).
-Colors:
-Light: background #f4f4f9, text #000000, buttons #007bff (hover #0056b3), text areas #ffffff.
-Dark: background #2d2d2d, text #ffffff, buttons #1e90ff (hover #4682b4), text areas #3c3c3c.
-Fluidity: Ensure chatbox/buttons remain visible, FAQ sidebar/results/image gallery scrollable, minimum window size 800x500.
-Chatbot Feel: Bottom chatbox, FAQ sidebar, bolded keywords, clickable images, and conversational results.
-Implementation Details:
+7. **Synonym Management**:
+   - `QTreeView` with `QStandardItemModel` (single column: “key: word1, word2, ...”).
+   - Add/edit/delete groups (`QLineEdit` for comma-separated words, `QPushButton` for add, context menu for edit/delete).
+   - Store in `data/synonyms.json`.
 
-Use ttk widgets for consistent styling.
-Handle errors (e.g., file processing, regex) with messagebox.
-Use Canvas for scrollable FAQ sidebar and image gallery.
-Store image references to prevent garbage collection.
-Update tag dropdown and document list after indexing.
-Export chat history to chat_transcript.txt.
-Setup:
+8. **Chat History**:
+   - `QTreeView` with `QStandardItemModel` (single column: queries).
+   - Filter with `QLineEdit`, re-run on double-click, export to `chat_transcript.txt`, clear history.
 
-Install: pip install tinydb fuzzywuzzy python-Levenshtein pdfplumber python-docx nltk pillow.
-Download NLTK: nltk.download('punkt'), nltk.download('stopwords').
-Create folders: docs/, data/, images/.
-Output:
+9. **Document Deletion**:
+   - `QTreeView` with `QStandardItemModel` (single column: filenames).
+   - Delete with `QPushButton`, confirm via `QMessageBox`, remove from `knowledge_db.json` and `images/`.
 
-Provide support_bot.py and README.md with setup/usage instructions.
-Ensure no dependencies on fitz, fastapi, or uvicorn.
-Test for Python 3.13 compatibility.
-Testing:
+10. **Toolbar**:
+    - `QToolBar` with actions: Index Documents, Upload Document, Toggle Dark Mode.
 
-Verify fuzzy/regex search with keyword highlighting.
-Test tag/filetype filtering, image display (.docx), dark mode toggle.
-Ensure FAQ/synonym/history/document tabs work, no duplicate indexing.
-Confirm fluid UI with visible chatbox/buttons in all window sizes.
+### Implementation Details
+- **Directory Structure**:
+  ```
+  retail_support_bot/
+  ├── data/
+  │   ├── knowledge_db.json    # Indexed paragraphs
+  │   ├── support_bot_db.json  # FAQs
+  │   ├── synonyms.json        # Synonym groups
+  ├── docs/                    # .pdf/.docx/.txt files
+  ├── images/                  # Extracted images
+  ├── retail_support_bot.py    # Main app
+  ├── chat_transcript.txt      # Chat history
+  ├── README.md
+  ```
+- **Dependencies**:
+  ```bash
+  pip install PyQt5 tinydb fuzzywuzzy python-Levenshtein pdfplumber python-docx nltk pillow PyMuPDF
+  ```
+  - Download NLTK data (once, requires internet):
+    ```python
+    import nltk
+    nltk.download('punkt')
+    nltk.download('stopwords')
+    ```
+- **PDF Image Extraction**:
+  - Use `PyMuPDF` (`fitz`) to extract images from PDFs to `images/` as PNGs. Example:
+    ```python
+    import fitz
+    doc = fitz.open(file_path)
+    image_paths = []
+    for page in doc:
+        for img in page.get_images():
+            xref = img[0]
+            base_image = doc.extract_image(xref)
+            with open(f"images/{doc_id}_img{len(image_paths)}.png", "wb") as f:
+                f.write(base_image["image"])
+            image_paths.append(f"images/{doc_id}_img{len(image_paths)}.png")
+    ```
+- **Text File Support**:
+  - Read `.txt` files line-by-line, treat each line as a paragraph. Example:
+    ```python
+    def extract_from_txt(self, file_path: str) -> dict:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            text = f.read()
+        return {"text": text, "image_paths": []}
+    def extract_txt_paragraphs(self, file_path: Path) -> list:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return [line.strip() for line in f if line.strip()]
+    ```
+  - Update `batch_index` and `upload_document` to handle `.txt` (filetype: “txt”).
+  - Update `filetype_combo` to include “txt”.
+- **Logic Reuse**:
+  - Retain non-UI logic (e.g., `extract_from_pdf`, `search`, `generate_tags`) from artifact ID `e36e43a5-9416-4373-b075-263e17113549`, adapting only for `.txt` support and `PyMuPDF` image extraction.
+  - Use `pdfplumber` for PDF text, `python-docx` for `.docx` text, `PyMuPDF` for PDF images.
+- **UI Implementation**:
+  - Use `QVBoxLayout`/`QHBoxLayout` for responsive UI.
+  - `QTextEdit` for HTML-formatted results (bolded keywords, line numbers).
+  - `QScrollArea` for FAQ sidebar (width=200) and image gallery (height=100, 80x80 thumbnails).
+  - `QTreeView` with `QStandardItemModel` for FAQs (`question`, `answer`), synonyms (`group`), history (`query`), documents (`filename`).
+  - `QToolBar` for Index, Upload, Toggle Theme actions.
+- **Error Handling**:
+  - Use `QMessageBox` for invalid regex, duplicate files, and deletion confirmation.
+  - Log errors with `logging` module (level: INFO).
+- **Image Handling**:
+  - Check `QPixmap.isNull()` in `display_images` to handle invalid images.
+  - Store images in `images/` as `<uuid>_imgX.png`.
+
+### UI/UX Requirements
+- Ensure chatbox/buttons always visible (bottom of Chat tab).
+- Responsive layouts to handle window resizing and multilingual text.
+- Native look-and-feel across Windows, macOS, Linux.
+- Smooth scrolling for FAQ sidebar, results, image gallery.
+- Use `Helvetica` fonts (10pt for `QTextEdit`/`QTreeView`, 11pt for `QWidget`, 12pt for titles/chatbox).
+- Error handling for file processing, regex, and image loading.
+
+### Deliverables
+- `retail_support_bot.py`: Main app with all features, artifact ID `e36e43a5-9416-4373-b075-263e17113549`.
+- `README.md`: Setup instructions, usage guide, dependency list, directory structure.
+- Ensure offline operation after NLTK setup.
+- Test for Python 3.13 compatibility, PyQt5 GPL license.
+
+### Testing
+- Verify chat interface: `QLineEdit` (600px), buttons visible, Enter key triggers search.
+- Test regex search: presets (Email, Phone), case-sensitive toggle, line numbers in `QTextEdit`.
+- Test image zoom: Click thumbnails, verify `QSlider`, mouse wheel, panning in `QDialog`.
+- Test dark mode: Toggle via `QToolBar`, check QSS consistency.
+- Test indexing/deletion: `QProgressBar` for batch, `QMessageBox` for duplicates/deletions, verify `.txt` support.
+- Test tabs: Navigate `QTabWidget`, verify `QTreeView` for FAQs, synonyms, history, documents.
+- Test offline: Disconnect internet post-setup, confirm functionality.
+
+### Notes
+- Use `PyMuPDF` for PDF image extraction to avoid external dependencies like `poppler`.
+- Retain artifact ID `e36e43a5-9416-4373-b075-263e17113549` for continuity.
+- Include all features from the original app, adding only `.txt` support and `PyMuPDF` integration.
+- For commercial use, consider PySide2 (LGPL) by replacing `PyQt5` imports.
