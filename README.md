@@ -96,54 +96,97 @@ Easy to maintain and expand with new documents.
 
 No costly AI infrastructure or ongoing cloud fees.
 
-Build a desktop chatbot application with a modern Tkinter GUI that helps support agents quickly search troubleshooting documents (Word .docx and PDF files) offline.
+#Prompt to make app
 
-Key requirements:
+Prompt:
 
-Use TinyDB to store an indexed JSON database of paragraphs extracted from the documents.
+Create a standalone Python application named suretail_support_bot.py using Tkinter for a knowledge base chatbot that feels conversational, fluid, and modern. The app must run on Python 3.13, be offline-compatible after initial setup, and use only open-source libraries: tinydb, fuzzywuzzy, python-Levenshtein, pdfplumber, python-docx, nltk, and pillow. The app should have the following features and design:
 
-Provide a script (index_documents.py) that:
+Directory Structure:
 
-Reads all .docx and .pdf files from a docs/ folder,
+text
 
-Extracts paragraphs or lines of text,
 
-Generates simple tags based on the most common non-stopwords in each paragraph and filename,
 
-Saves this info into a TinyDB JSON file (knowledge_db.json) in a data/ folder.
+support_bot/
+├── data/
+│   ├── knowledge_db.json    # Stores indexed paragraphs
+│   ├── support_bot_db.json  # Stores FAQs
+│   ├── synonyms.json        # Stores synonym groups
+├── docs/                    # For .pdf/.docx files
+├── images/                  # For extracted .docx images
+├── support_bot.py           # Main app
+├── chat_transcript.txt      # Exported chat history
+├── README.md
+Features:
 
-The chatbot GUI (support_bot.py) should:
+Chat Interface:
+A large chat input box (Entry, width=80, font="Helvetica 12") at the bottom of the Chat tab, with Send and Clear buttons always visible (even in smaller windows, min size 800x500).
+Pressing Enter triggers the search.
+Results display in a scrollable text area (ScrolledText, height=10) with bolded keywords (font="Helvetica 10 bold") and grouped by filename (📄 filename headers).
+A scrollable FAQ sidebar (using Canvas) on the left for quick question buttons.
+Fuzzy Search:
+Use fuzzywuzzy for keyword matching (threshold 70%) with synonym expansion from synonyms.json.
+Highlight matched words in results (wrap with ** and bold in UI).
+Regex Search:
+Add a "Regex Search" checkbox to enable pattern-based search (e.g., log* matches “login,” “logout”).
+Handle invalid regex patterns with an error message.
+Highlight regex matches in results.
+Tag/Filetype Filtering:
+Dropdowns for tags (from document content/filenames, top 5 words via NLTK) and filetypes (“All,” “.pdf,” “.docx”).
+Filter results based on selected tag/filetype.
+Image Display:
+Extract images from .docx files (save to images/ with unique names, e.g., <uuid>_img0.png) during indexing.
+Display thumbnails (80x80) in a scrollable horizontal gallery (Canvas) below results.
+Click thumbnails to open full-size images in the default viewer.
+Dark Mode:
+Toggle between light (#f4f4f9 background, #007bff buttons) and dark (#2d2d2d background, #1e90ff buttons) themes via a “Toggle Dark/Light Mode” button.
+Update all widgets (frames, buttons, text, etc.) dynamically.
+Tabs:
+Chat: Search, filters, results, image gallery, chatbox.
+FAQ Management: Add/edit FAQs in a Treeview (columns: Question, Answer).
+Synonym Management: Add/edit comma-separated synonym groups in a Treeview.
+Chat History: List previous queries in a Treeview, clickable to re-run, with “Export Chat” and “Clear History” buttons.
+Documents: List indexed document names in a Treeview to prevent duplicates.
+Document Indexing:
+Index .pdf (via pdfplumber) and .docx files from docs/ or single uploads.
+Split PDFs into sentences (>20 chars) and DOCX into paragraphs.
+Generate tags using NLTK (word_tokenize, stopwords, top 5 words + filename words).
+Store in knowledge_db.json with filename, filetype, text, tags, and image paths.
+Prevent duplicate indexing by checking filenames.
+Offline Compatibility:
+Use local storage (knowledge_db.json, support_bot_db.json, synonyms.json).
+Require NLTK data (punkt, stopwords) downloaded once.
+UI Design:
 
-Load the TinyDB database,
+Layout: Responsive with grid/pack, weight=1 for scaling, 10px padding.
+Typography: Helvetica fonts (10/11/12 for body/labels/headers).
+Colors:
+Light: background #f4f4f9, text #000000, buttons #007bff (hover #0056b3), text areas #ffffff.
+Dark: background #2d2d2d, text #ffffff, buttons #1e90ff (hover #4682b4), text areas #3c3c3c.
+Fluidity: Ensure chatbox/buttons remain visible, FAQ sidebar/results/image gallery scrollable, minimum window size 800x500.
+Chatbot Feel: Bottom chatbox, FAQ sidebar, bolded keywords, clickable images, and conversational results.
+Implementation Details:
 
-Accept user queries with an input box and a “Search” button,
+Use ttk widgets for consistent styling.
+Handle errors (e.g., file processing, regex) with messagebox.
+Use Canvas for scrollable FAQ sidebar and image gallery.
+Store image references to prevent garbage collection.
+Update tag dropdown and document list after indexing.
+Export chat history to chat_transcript.txt.
+Setup:
 
-Perform fuzzy keyword matching (using fuzzywuzzy) against the indexed paragraphs,
+Install: pip install tinydb fuzzywuzzy python-Levenshtein pdfplumber python-docx nltk pillow.
+Download NLTK: nltk.download('punkt'), nltk.download('stopwords').
+Create folders: docs/, data/, images/.
+Output:
 
-Expand query keywords using a synonyms JSON file (synonyms.json) to improve matching,
+Provide support_bot.py and README.md with setup/usage instructions.
+Ensure no dependencies on fitz, fastapi, or uvicorn.
+Test for Python 3.13 compatibility.
+Testing:
 
-Allow filtering results by tags and file types via dropdown menus,
-
-Show search results with highlighted matched keywords,
-
-Display results grouped by source document filename,
-
-Include a chat history panel with clickable past queries,
-
-Provide a “Quick FAQ” sidebar with common preset questions as buttons,
-
-Enable exporting the chat transcript to a text file,
-
-Have a clean, modern UI design with readable fonts, colors, and layouts,
-
-Be fully offline with no internet dependencies after initial package/model setup.
-
-Include a synonyms.json file with synonym groups for keyword expansion.
-
-Provide a README.md with setup instructions, including required Python packages and usage steps.
-
-Use only free, open-source Python libraries (e.g., tkinter, tinydb, python-docx, pdfplumber, fuzzywuzzy, nltk).
-
-The app must be easy to maintain by adding new docs to docs/ and re-running the indexing script.
-
-Deliver a ZIP archive of all scripts, sample data folder structure, and README.
+Verify fuzzy/regex search with keyword highlighting.
+Test tag/filetype filtering, image display (.docx), dark mode toggle.
+Ensure FAQ/synonym/history/document tabs work, no duplicate indexing.
+Confirm fluid UI with visible chatbox/buttons in all window sizes.
