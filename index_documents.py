@@ -1,4 +1,4 @@
-```python
+
 # Retail Support Demo: Offline knowledge base app for managing and searching documents with embedded image support
 # Uses tkinter for GUI, TinyDB for storage, PyMuPDF/docx for document processing, PIL for images, fuzzywuzzy/scikit-learn for search/tags
 import os
