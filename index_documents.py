@@ -1,6 +1,9 @@
+```python
+# Retail Support Demo: Offline knowledge base app for managing and searching documents with embedded image support
+# Uses tkinter for GUI, TinyDB for storage, PyMuPDF/docx for document processing, PIL for images, fuzzywuzzy/scikit-learn for search/tags
 import os
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, simpledialog  # Added simpledialog for askstring
 from tkinter.scrolledtext import ScrolledText
 from tinydb import TinyDB, Query
 from docx import Document as DocxDocument
@@ -13,27 +16,30 @@ from datetime import datetime
 import pickle
 import logging
 
-# Setup logging
+# Configure logging to save errors and events to app.log for offline debugging
 logging.basicConfig(filename="app.log", level=logging.INFO)
 
-# Initialize database and folders
-db = TinyDB("knowledge_base.json")
-doc_table = db.table("documents")
-kb_folder = "kb_documents"
-img_folder = "images"
-os.makedirs(kb_folder, exist_ok=True)
-os.makedirs(img_folder, exist_ok=True)
+# Initialize database and folders for storing documents and images
+db = TinyDB("knowledge_base.json")  # Database file for document metadata
+doc_table = db.table("documents")  # Table for organizing document records
+kb_folder = "kb_documents"  # Folder for storing document files
+img_folder = "images"  # Folder for storing extracted and associated images
+os.makedirs(kb_folder, exist_ok=True)  # Create document folder if it doesn't exist
+os.makedirs(img_folder, exist_ok=True)  # Create image folder if it doesn't exist
 
-# Helper functions
+# Helper Functions
 def extract_text(file_path, max_images=5):
+    """Extract text and up to max_images embedded images from TXT, PDF, or DOCX files."""
     ext = file_path.lower()
-    images = []
-    text = ""
+    images = []  # List to store extracted image filenames
+    text = ""  # Extracted text content
     try:
         if ext.endswith(".txt"):
+            # Read plain text files
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 text = f.read()
         elif ext.endswith(".docx"):
+            # Extract text and images from DOCX files
             doc = DocxDocument(file_path)
             text = "\n".join([p.text for p in doc.paragraphs])
             img_count = 0
@@ -47,6 +53,7 @@ def extract_text(file_path, max_images=5):
                     images.append(img_name)
                     img_count += 1
         elif ext.endswith(".pdf"):
+            # Extract text and images from PDF files
             doc = fitz.open(file_path)
             text = "\n".join([page.get_text() for page in doc])
             img_count = 0
@@ -69,6 +76,7 @@ def extract_text(file_path, max_images=5):
     return text, images
 
 def generate_tags(text, top_n=5):
+    """Generate top_n tags from text using TF-IDF and return vector for caching."""
     vectorizer = TfidfVectorizer(stop_words="english", max_features=50)
     try:
         X = vectorizer.fit_transform([text])
@@ -76,11 +84,12 @@ def generate_tags(text, top_n=5):
         words = vectorizer.get_feature_names_out()
         top_indices = scores.argsort()[::-1][:top_n]
         tags = [words[i] for i in top_indices if scores[i] > 0]
-        return tags, pickle.dumps((X, vectorizer))
+        return tags, pickle.dumps((X, vectorizer))  # Cache vector for performance
     except:
         return [], None
 
 def highlight_text(text_widget, keyword, case_sensitive=False):
+    """Highlight occurrences of keyword in text_widget, with optional case sensitivity."""
     text_widget.tag_remove("highlight", "1.0", tk.END)
     if keyword:
         idx = "1.0"
@@ -94,31 +103,35 @@ def highlight_text(text_widget, keyword, case_sensitive=False):
         text_widget.tag_config("highlight", background="yellow")
 
 def is_duplicate(file_name):
+    """Check if a document with file_name already exists in the database."""
     return any(doc["name"] == file_name for doc in doc_table.all())
 
-# GUI
+# Main Application Class
 class KnowledgeBaseApp:
     def __init__(self, root):
+        """Initialize the app with GUI setup, database check, and state variables."""
         self.root = root
         self.root.title("Retail Support Demo")
-        self.root.configure(bg="#f0f0f0")
+        self.root.configure(bg="#f0f0f0")  # Neutral background for better aesthetics
         self.root.geometry("1000x600")
-        self.root.resizable(True, True)
+        self.root.resizable(True, True)  # Allow window resizing
         self.root.style = ttk.Style()
-        self.root.style.theme_use("clam")
+        self.root.style.theme_use("clam")  # Modern theme
         
-        self.current_image_index = 0
-        self.current_images = []
-        self.status_var = tk.StringVar(value="Ready")
-        self.font_size = 12
-        self.zoom_level = 1.0
-        self.pan_start_x = 0
-        self.pan_start_y = 0
-        self.tooltip = None
-        self.word_wrap_var = tk.BooleanVar(value=True)
-        self.case_sensitive_var = tk.BooleanVar(value=False)
-        self.sort_var = tk.StringVar(value="Name")
+        # Initialize state variables
+        self.current_image_index = 0  # Current image being displayed
+        self.current_images = []  # List of images for the current document
+        self.status_var = tk.StringVar(value="Ready")  # Status bar message
+        self.font_size = 12  # Text preview font size
+        self.zoom_level = 1.0  # Image zoom level
+        self.pan_start_x = 0  # Image pan start X coordinate
+        self.pan_start_y = 0  # Image pan start Y coordinate
+        self.tooltip = None  # Tooltip for listbox hover
+        self.word_wrap_var = tk.BooleanVar(value=True)  # Word wrap toggle
+        self.case_sensitive_var = tk.BooleanVar(value=False)  # Case-sensitive search
+        self.sort_var = tk.StringVar(value="Name")  # Document sort criterion
         
+        # Check database integrity on startup
         try:
             doc_table.all()
         except Exception as e:
@@ -129,12 +142,14 @@ class KnowledgeBaseApp:
                 self.status_var.set("Database error; some features may not work")
             logging.error(f"Database error on startup: {str(e)}")
         
+        # Setup GUI components
         self.setup_menu()
         self.setup_layout()
         self.setup_context_menu()
         self.load_documents()
 
     def setup_menu(self):
+        """Configure the menu bar with File and Help options."""
         menubar = tk.Menu(self.root)
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label="Add KB Document", command=self.add_document, accelerator="Ctrl+O")
@@ -151,24 +166,28 @@ class KnowledgeBaseApp:
         menubar.add_cascade(label="Help", menu=help_menu)
         
         self.root.config(menu=menubar)
-        self.root.bind("<Control-o>", lambda e: self.add_document())
-        self.root.bind("<Control-f>", lambda e: self.search_entry.focus())
+        self.root.bind("<Control-o>", lambda e: self.add_document())  # Shortcut for adding documents
+        self.root.bind("<Control-f>", lambda e: self.search_entry.focus())  # Shortcut for search focus
 
     def setup_layout(self):
+        """Setup the GUI layout with document list, text preview, image canvas, and controls."""
+        # Main frame for layout
         self.main_frame = ttk.Frame(self.root, padding=5)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
         self.main_frame.pack_propagate(False)
 
+        # Left frame for document list
         self.left_frame = ttk.Frame(self.main_frame, width=250)
         self.left_frame.pack(side=tk.LEFT, fill=tk.Y)
         self.left_frame.pack_propagate(False)
 
-        self.doc_listbox = tk.Listbox(self.left_frame, selectmode=tk.MULTIPLE)
+        self.doc_listbox = tk.Listbox(self.left_frame, selectmode=tk.MULTIPLE)  # Allow multiple selections
         self.doc_listbox.pack(fill=tk.BOTH, expand=True)
         self.doc_listbox.bind("<<ListboxSelect>>", self.display_selected_document)
-        self.doc_listbox.bind("<Motion>", self.show_tooltip)
-        self.doc_listbox.bind("<Leave>", self.hide_tooltip)
+        self.doc_listbox.bind("<Motion>", self.show_tooltip)  # Show tooltip on hover
+        self.doc_listbox.bind("<Leave>", self.hide_tooltip)  # Hide tooltip on leave
 
+        # Right frame for text and image preview
         self.right_frame = ttk.Frame(self.main_frame)
         self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         self.right_frame.pack_propagate(False)
@@ -176,18 +195,20 @@ class KnowledgeBaseApp:
         self.text_preview = ScrolledText(self.right_frame, wrap=tk.WORD, font=("TkDefaultFont", self.font_size))
         self.text_preview.pack(fill=tk.BOTH, expand=True)
 
+        # Image canvas for displaying images with zoom/pan
         self.image_frame = ttk.Frame(self.right_frame)
         self.image_frame.pack()
         self.image_canvas = tk.Canvas(self.image_frame, width=400, height=300)
         self.image_canvas.pack()
-        self.image_canvas.bind("<MouseWheel>", self.zoom_image)
-        self.image_canvas.bind("<ButtonPress-1>", self.start_pan)
-        self.image_canvas.bind("<B1-Motion>", self.pan_image)
+        self.image_canvas.bind("<MouseWheel>", self.zoom_image)  # Zoom with mouse wheel
+        self.image_canvas.bind("<ButtonPress-1>", self.start_pan)  # Start panning
+        self.image_canvas.bind("<B1-Motion>", self.pan_image)  # Pan image
         self.prev_button = ttk.Button(self.image_frame, text="Prev", command=self.show_prev_image, state=tk.DISABLED)
         self.prev_button.pack(side=tk.LEFT)
         self.next_button = ttk.Button(self.image_frame, text="Next", command=self.show_next_image, state=tk.DISABLED)
         self.next_button.pack(side=tk.LEFT)
 
+        # Bottom frame for search and control widgets
         self.bottom_frame = ttk.Frame(self.root)
         self.bottom_frame.pack(side=tk.BOTTOM, pady=5)
         
@@ -237,14 +258,17 @@ class KnowledgeBaseApp:
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
     def setup_context_menu(self):
+        """Setup right-click context menu for document listbox."""
         self.context_menu = tk.Menu(self.root, tearoff=0)
         self.context_menu.add_command(label="Delete", command=self.delete_document)
         self.doc_listbox.bind("<Button-3>", self.show_context_menu)
 
     def show_context_menu(self, event):
+        """Display context menu at the mouse position."""
         self.context_menu.post(event.x_root, event.y_root)
 
     def add_document(self):
+        """Add documents via file dialog, extracting text, images, and tags."""
         def process_files():
             try:
                 for path in file_paths:
@@ -254,7 +278,8 @@ class KnowledgeBaseApp:
                         continue
                     text, images = extract_text(path)
                     tags, vector = generate_tags(text)
-                    category = filedialog.askstring("Category", f"Enter category for {name}:", parent=self.root) or "Uncategorized"
+                    # Use simpledialog.askstring to prompt for category
+                    category = simpledialog.askstring("Category", f"Enter category for {name}:", parent=self.root) or "Uncategorized"
                     doc_table.insert({"name": name, "content": text, "tags": tags, "images": images, "created": str(datetime.now()), "category": category, "vector": vector})
                     dest = os.path.join(kb_folder, name)
                     if not os.path.exists(dest):
@@ -268,9 +293,10 @@ class KnowledgeBaseApp:
         
         file_paths = filedialog.askopenfilenames(filetypes=[("Documents", "*.txt *.pdf *.docx")])
         if file_paths:
-            threading.Thread(target=process_files, daemon=True).start()
+            threading.Thread(target=process_files, daemon=True).start()  # Run in thread to keep GUI responsive
 
     def scan_folder(self):
+        """Scan a folder to import documents, extracting text, images, and tags."""
         def process_folder():
             try:
                 for file in os.listdir(folder):
@@ -279,7 +305,8 @@ class KnowledgeBaseApp:
                         if not is_duplicate(file):
                             text, images = extract_text(full_path)
                             tags, vector = generate_tags(text)
-                            category = filedialog.askstring("Category", f"Enter category for {file}:", parent=self.root) or "Uncategorized"
+                            # Use simpledialog.askstring to prompt for category
+                            category = simpledialog.askstring("Category", f"Enter category for {file}:", parent=self.root) or "Uncategorized"
                             doc_table.insert({"name": file, "content": text, "tags": tags, "images": images, "created": str(datetime.now()), "category": category, "vector": vector})
                             dest = os.path.join(kb_folder, file)
                             if not os.path.exists(dest):
@@ -296,6 +323,7 @@ class KnowledgeBaseApp:
             threading.Thread(target=process_folder, daemon=True).start()
 
     def load_documents(self):
+        """Load and display documents in the listbox, sorted by name, date, or category."""
         self.doc_listbox.delete(0, tk.END)
         docs = doc_table.all()
         sort_key = self.sort_var.get()
@@ -313,6 +341,7 @@ class KnowledgeBaseApp:
         self.category_filter.config(values=categories)
 
     def display_selected_document(self, event=None):
+        """Display the selected document's content and images."""
         selection = self.doc_listbox.curselection()
         if not selection:
             return
@@ -325,6 +354,7 @@ class KnowledgeBaseApp:
             self.status_var.set(f"Tags: {', '.join(doc['tags'])}, Category: {doc.get('category', 'Uncategorized')}, Size: {os.path.getsize(os.path.join(kb_folder, name))} bytes")
 
     def show_image(self, doc_name):
+        """Initialize image display for a document, prioritizing embedded images."""
         self.image_canvas.delete("all")
         self.current_images = []
         self.current_image_index = 0
@@ -341,6 +371,7 @@ class KnowledgeBaseApp:
         self.update_image()
 
     def update_image(self):
+        """Update the image canvas with the current image, applying zoom."""
         self.image_canvas.delete("all")
         if self.current_images and 0 <= self.current_image_index < len(self.current_images):
             img_path = os.path.join(img_folder, self.current_images[self.current_image_index])
@@ -362,33 +393,39 @@ class KnowledgeBaseApp:
             self.status_var.set("No images available")
 
     def zoom_image(self, event):
+        """Zoom the image in/out using the mouse wheel."""
         scale = 1.1 if event.delta > 0 else 0.9
         self.zoom_level *= scale
         self.zoom_level = max(0.5, min(self.zoom_level, 3.0))
         self.update_image()
 
     def start_pan(self, event):
+        """Start panning the image by setting the initial mouse position."""
         self.image_canvas.scan_mark(event.x, event.y)
         self.pan_start_x = event.x
         self.pan_start_y = event.y
 
     def pan_image(self, event):
+        """Pan the image by dragging the mouse."""
         self.image_canvas.scan_dragto(event.x, event.y, gain=1)
         self.status_var.set("Panning image")
 
     def show_prev_image(self):
+        """Show the previous image in the list."""
         if self.current_image_index > 0:
             self.current_image_index -= 1
-            self.zoom_level = 1.0  # Reset zoom when switching images
+            self.zoom_level = 1.0  # Reset zoom
             self.update_image()
 
     def show_next_image(self):
+        """Show the next image in the list."""
         if self.current_image_index < len(self.current_images) - 1:
             self.current_image_index += 1
-            self.zoom_level = 1.0  # Reset zoom when switching images
+            self.zoom_level = 1.0  # Reset zoom
             self.update_image()
 
     def associate_image(self):
+        """Associate an external image with a selected document."""
         selection = self.doc_listbox.curselection()
         if not selection:
             self.status_var.set("No document selected")
@@ -407,6 +444,7 @@ class KnowledgeBaseApp:
                 logging.error(f"Associate image error: {str(e)}")
 
     def search_documents(self):
+        """Search documents by query, with tag, category, date, and case-sensitive filters."""
         query = self.search_var.get().strip()
         tag_filter = self.tag_filter.get()
         category_filter = self.category_filter.get()
@@ -459,6 +497,7 @@ class KnowledgeBaseApp:
             self.status_var.set("No results found")
 
     def clear_search(self):
+        """Clear search query, filters, and reset the document list."""
         self.search_var.set("")
         self.start_date_var.set("")
         self.end_date_var.set("")
@@ -470,6 +509,7 @@ class KnowledgeBaseApp:
         self.status_var.set("Search cleared")
 
     def delete_document(self):
+        """Delete selected documents and their associated images."""
         selections = self.doc_listbox.curselection()
         for index in selections[::-1]:
             name = self.doc_listbox.get(index)
@@ -494,6 +534,7 @@ class KnowledgeBaseApp:
         self.status_var.set(f"Deleted {len(selections)} documents")
 
     def export_database(self):
+        """Export the database to a JSON file."""
         try:
             export_path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")])
             if export_path:
@@ -505,6 +546,7 @@ class KnowledgeBaseApp:
             logging.error(f"Export database error: {str(e)}")
 
     def import_database(self):
+        """Import a database from a JSON file."""
         try:
             import_path = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
             if import_path:
@@ -516,6 +558,7 @@ class KnowledgeBaseApp:
             logging.error(f"Import database error: {str(e)}")
 
     def show_all_documents(self):
+        """Display a list of all document names in a dialog."""
         all_docs = doc_table.all()
         if not all_docs:
             messagebox.showinfo("Documents", "No documents in the database.")
@@ -524,6 +567,7 @@ class KnowledgeBaseApp:
         messagebox.showinfo("All Documents", doc_names)
 
     def toggle_high_contrast(self):
+        """Toggle between high-contrast and default themes."""
         if self.root.style.theme_use() == "clam":
             self.root.style.theme_use("alt")
             self.status_var.set("High-contrast mode enabled")
@@ -532,22 +576,26 @@ class KnowledgeBaseApp:
             self.status_var.set("High-contrast mode disabled")
 
     def toggle_word_wrap(self):
+        """Toggle word wrap in the text preview."""
         wrap = tk.WORD if self.word_wrap_var.get() else tk.NONE
         self.text_preview.config(wrap=wrap)
         self.status_var.set(f"Word wrap {'enabled' if wrap == tk.WORD else 'disabled'}")
 
     def increase_font_size(self):
+        """Increase the text preview font size."""
         self.font_size += 2
         self.text_preview.config(font=("TkDefaultFont", self.font_size))
         self.status_var.set(f"Font size: {self.font_size}")
 
     def decrease_font_size(self):
+        """Decrease the text preview font size, with a minimum of 8."""
         if self.font_size > 8:
             self.font_size -= 2
             self.text_preview.config(font=("TkDefaultFont", self.font_size))
             self.status_var.set(f"Font size: {self.font_size}")
 
     def show_tooltip(self, event):
+        """Show a tooltip with document details on listbox hover."""
         index = self.doc_listbox.nearest(event.y)
         if index >= 0:
             name = self.doc_listbox.get(index)
@@ -563,11 +611,13 @@ class KnowledgeBaseApp:
                 label.pack()
 
     def hide_tooltip(self, event):
+        """Hide the tooltip when the mouse leaves the listbox."""
         if self.tooltip:
             self.tooltip.destroy()
             self.tooltip = None
 
     def show_help(self):
+        """Display help text with instructions for using the app."""
         help_text = (
             "Retail Support Demo\n\n"
             "- Add documents: File > Add KB Document (Ctrl+O)\n"
