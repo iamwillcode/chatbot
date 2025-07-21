@@ -101,158 +101,42 @@ No costly AI infrastructure or ongoing cloud fees.
 Prompt:
 
 
-Create a Tkinter desktop application named `retail_support_bot_tk.py` for an offline knowledge base chatbot, replicating the functionality of a previous PyQt5 app (artifact ID `e36e43a5-9416-4373-b075-263e17113549`). The app must support `.pdf`, `.docx`, and `.txt` files, use `PyMuPDF` (`fitz`) for PDF image extraction (no `poppler` or external dependencies beyond Python packages), run offline after setup, and be compatible with Python 3.13. Use `tkinter`, `ttk`, `tinydb`, `fuzzywuzzy`, `python-Levenshtein`, `pdfplumber`, `python-docx`, `nltk`, `pillow`, and `PyMuPDF`. Below are the requirements:
 
-### Core Features
-1. **Chat Interface**:
-   - Use `tk.Tk` with minimum size 800x500, title "Retail Support Bot - Knowledge Base Chatbot".
-   - `ttk.Notebook` with 5 tabs: Chat, FAQ Management, Synonym Management, Chat History, Documents.
-   - Chat tab:
-     - Left sidebar (`tk.Canvas`, width=200, with `ttk.Scrollbar`) for FAQ buttons (`ttk.Button`).
-     - Main area (`ttk.Frame`, `grid` layout):
-       - Filters: `ttk.Combobox` for tags (NLTK-generated), filetypes (“All”, “pdf”, “docx”, “txt”), `ttk.Checkbutton` for “Regex Search” and “Case Sensitive”, `ttk.Combobox` for regex presets (“Custom”, “Email: \b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b”, “Phone: \b\d{3}-\d{3}-\d{4}\b”).
-       - Results: `tk.Text` (read-only, `Helvetica 10`, height=10 lines, HTML with `<b>` for keywords, `<i>` for line numbers, scrollbar).
-       - Image gallery: `tk.Canvas` (height=100, `ttk.Scrollbar`, horizontal) with 80x80 thumbnails (`ttk.Label` with `ImageTk.PhotoImage`).
-       - Chatbox: `ttk.Entry` (width=60, `Helvetica 12`), Send/Clear `ttk.Button`. Enter key triggers search.
-   - Responsive `grid` layout to prevent text cutoff.
+Below is a concise list of recommended changes to improve your offline knowledge base app, focusing on enabling the display of images embedded in documents (PDFs and DOCX files) and enhancing overall functionality, while keeping the app offline and dependency-free for end users. These recommendations incorporate the suggestions for handling embedded images and additional improvements for usability, performance, and robustness.
 
-2. **Search**:
-   - Fuzzy search (`fuzzywuzzy`, threshold 70%) with synonym expansion (`synonyms.json`).
-   - Regex search with case-sensitive toggle and presets.
-   - Filter by tags (`ttk.Combobox`, top 5 NLTK words + filename) and filetype.
-   - Display results in `tk.Text` with filename, score, tags, line numbers (regex only), bolded keywords (HTML `<b>`).
-   - Show images in gallery, clickable to open zoomable `tk.Toplevel`.
-
-3. **Image Display/Zoom**:
-   - Extract images from PDFs (`PyMuPDF`) and `.docx` (`python-docx`) to `images/` (`<uuid>_imgX.png`). No images from `.txt`.
-   - Display thumbnails in `tk.Canvas` (`ttk.Label`, 80x80, `ImageTk.PhotoImage`).
-   - Zoomable `tk.Toplevel` (600x400) with `tk.Canvas`, `ttk.Scrollbar` (horizontal/vertical), `ttk.Scale` (50–200% zoom), mouse wheel zoom (0.5x–2x), and drag-to-pan.
-
-4. **Theme**:
-   - Toggle light (`#f4f4f9` background, `#007bff` buttons, `#ffffff` entries) and dark (`#2d2d2d` background, `#1e90ff` buttons, `#3c3c3c` entries) themes via `ttk.Style` and widget configs.
-   - Use `Helvetica` fonts (10pt for `tk.Text`/`ttk.Treeview`, 11pt for `ttk.Label`/`ttk.Button`, 12pt for titles/`ttk.Entry`).
-   - Menu bar (`tk.Menu`) with Index Documents, Upload Document, Toggle Theme.
-
-5. **Document Indexing**:
-   - Index `.pdf` (sentences >20 chars via `pdfplumber`), `.docx` (paragraphs via `python-docx`), `.txt` (lines) from `docs/` (batch) or `filedialog` (single).
-   - Generate tags using NLTK (`word_tokenize`, `stopwords`, top 5 words + filename).
-   - Store in `data/knowledge_db.json` with `filename`, `filetype` (“pdf”, “docx”, “txt”), `text`, `tags`, `image_paths`.
-   - Show `ttk.Progressbar` for batch indexing.
-   - Check duplicates with `messagebox.showwarning`.
-
-6. **FAQ Management**:
-   - `ttk.Treeview` (`Question`, `Answer` columns, 300px/400px).
-   - Add/edit/delete FAQs (`ttk.Entry` for inputs, `ttk.Button` for add, right-click menu for edit/delete).
-   - Store in `data/support_bot_db.json`.
-
-7. **Synonym Management**:
-   - `ttk.Treeview` (single column: “key: word1, word2, ...”).
-   - Add/edit/delete groups (`ttk.Entry` for comma-separated words, `ttk.Button` for add, right-click menu for edit/delete).
-   - Store in `data/synonyms.json`.
-
-8. **Chat History**:
-   - `ttk.Treeview` (single column: queries).
-   - Filter with `ttk.Entry`, re-run on double-click, export to `chat_transcript.txt`, clear history.
-
-9. **Document Deletion**:
-   - `ttk.Treeview` (single column: filenames).
-   - Delete with `ttk.Button`, confirm via `messagebox.askyesno`, remove from `knowledge_db.json` and `images/`.
-
-10. **Menu Bar**:
-    - `tk.Menu` with actions: Index Documents, Upload Document, Toggle Theme.
-
-### Implementation Details
-- **Directory Structure**:
-  ```
-  retail_support_bot/
-  ├── data/
-  │   ├── knowledge_db.json    # Indexed paragraphs
-  │   ├── support_bot_db.json  # FAQs
-  │   ├── synonyms.json        # Synonym groups
-  ├── docs/                    # .pdf/.docx/.txt files
-  ├── images/                  # Extracted images
-  ├── retail_support_bot_tk.py # Main app
-  ├── chat_transcript.txt      # Chat history
-  ├── README.md
-  ```
-- **Dependencies**:
-  ```bash
-  pip install tinydb fuzzywuzzy python-Levenshtein pdfplumber python-docx nltk pillow PyMuPDF
-  ```
-  - Download NLTK data (once, requires internet):
-    ```python
-    import nltk
-    nltk.download('punkt')
-    nltk.download('stopwords')
-    ```
-- **PDF Image Extraction**:
-  - Use `PyMuPDF` (`fitz`) for PDF images to `images/` as PNGs. Example:
-    ```python
-    import fitz
-    doc = fitz.open(file_path)
-    image_paths = []
-    for page in doc:
-        for img in page.get_images():
-            xref = img[0]
-            base_image = doc.extract_image(xref)
-            with open(f"images/{doc_id}_img{len(image_paths)}.png", "wb") as f:
-                f.write(base_image["image"])
-            image_paths.append(f"images/{doc_id}_img{len(image_paths)}.png")
-    ```
-- **Text File Support**:
-  - Read `.txt` files line-by-line, treat each line as a paragraph. Example:
-    ```python
-    def extract_from_txt(self, file_path: str) -> dict:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            text = f.read()
-        return {"text": text, "image_paths": []}
-    def extract_txt_paragraphs(self, file_path: Path) -> list:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return [line.strip() for line in f if line.strip()]
-    ```
-  - Update `batch_index` and `upload_document` to handle `.txt` (filetype: “txt”).
-  - Update `filetype_combo` to include “txt”.
-- **Logic Reuse**:
-  - Retain non-UI logic (e.g., `extract_from_pdf`, `search`, `generate_tags`) from artifact ID `e36e43a5-9416-4373-b075-263e17113549`, adapting for `.txt` and `PyMuPDF`.
-  - Use `pdfplumber` for PDF text, `python-docx` for `.docx` text, `PyMuPDF` for PDF images.
-- **UI Implementation**:
-  - Use `grid` for responsive layout.
-  - `tk.Text` for HTML results (bolded keywords via `<b>`, line numbers via `<i>`).
-  - `tk.Canvas` with `ttk.Scrollbar` for FAQ sidebar (width=200) and image gallery (height=100, 80x80 thumbnails).
-  - `ttk.Treeview` for FAQs (`Question`, `Answer`), synonyms (`Group`), history (`Query`), documents (`Filename`).
-  - `tk.Menu` for Index, Upload, Toggle Theme.
-- **Error Handling**:
-  - Use `messagebox` for invalid regex, duplicates, and deletion confirmation.
-  - Log errors with `logging` (level: INFO).
-  - Check `Image.open` for valid images in `display_images`.
-- **Image Handling**:
-  - Use `ImageTk.PhotoImage` for thumbnails, keep references to prevent garbage collection.
-  - Store images in `images/` as `<uuid>_imgX.png`.
-
-### UI/UX Requirements
-- Ensure chatbox/buttons always visible (bottom of Chat tab).
-- Responsive `grid` layout for resizing and multilingual text.
-- Native look-and-feel across Windows, macOS, Linux.
-- Smooth scrolling for FAQ sidebar, results, image gallery.
-- Use `Helvetica` fonts (10pt for `tk.Text`/`ttk.Treeview`, 11pt for `ttk.Label`/`ttk.Button`, 12pt for titles/`ttk.Entry`).
-- Error handling for file processing, regex, and image loading.
-
-### Deliverables
-- `retail_support_bot_tk.py`: Main app with all features, artifact ID `e36e43a5-9416-4373-b075-263e17113549`.
-- `README.md`: Setup instructions, usage guide, dependency list, directory structure.
-- Ensure offline operation after NLTK setup.
-- Test for Python 3.13 compatibility, Tkinter (Python standard library).
-
-### Testing
-- Verify chat interface: `ttk.Entry` (width=60), buttons visible, Enter key triggers search.
-- Test regex search: presets (Email, Phone), case-sensitive toggle, line numbers in `tk.Text`.
-- Test image zoom: Click thumbnails, verify `ttk.Scale`, mouse wheel, panning in `tk.Toplevel`.
-- Test theme: Toggle via menu, check `ttk.Style` consistency.
-- Test indexing/deletion: `ttk.Progressbar` for batch, `messagebox` for duplicates/deletions, verify `.txt` support.
-- Test tabs: Navigate `ttk.Notebook`, verify `ttk.Treeview` for FAQs, synonyms, history, documents.
-- Test offline: Disconnect internet post-setup, confirm functionality.
-
-### Notes
-- Use `PyMuPDF` for PDF image extraction to avoid external dependencies.
-- Retain artifact ID `e36e43a5-9416-4373-b075-263e17113549` for continuity.
-- Include all features from the original PyQt5 app, with `.txt` support and `PyMuPDF`.
+Extract Embedded Images from Documents
+Modify the extract_text function to extract images from PDFs (using PyMuPDF) and DOCX files (using python-docx), saving them to the img_folder with unique names (e.g., docname_pageX_imgY.png).
+Return both text and a list of image filenames from extract_text.
+Store Image References in Database
+Update add_document and scan_folder to store the list of extracted image filenames in the TinyDB database alongside document metadata (name, content, tags).
+Ensure database entries include an "images" field for embedded images.
+Display Embedded Images in GUI
+Modify the show_image method to prioritize displaying embedded images stored in the database’s "images" field.
+Fallback to existing logic for external images (e.g., docname.jpg in img_folder) if no embedded images exist.
+Optionally, add "Prev" and "Next" buttons to cycle through multiple embedded images, with a status bar indicating the current image (e.g., "Image 1 of 3").
+Clean Up Images on Document Deletion
+Update the delete_document method to remove associated embedded images from img_folder when a document is deleted, in addition to external images.
+Improve User Interface
+Change the red background (self.root.configure(bg="red")) to a neutral color (e.g., #f0f0f0) or use a ttk theme (e.g., clam) for a modern look.
+Make the app resizable with proportional frame resizing using self.root.resizable(True, True) and pack_propagate(False).
+Add a status bar to display messages (e.g., "Added docname with 2 images") using ttk.Label with a StringVar.
+Add a right-click context menu to the document listbox for deleting documents.
+Enhance Search Functionality
+Add a tag filter dropdown (ttk.Combobox) to search by specific tags, populated with unique tags from the database.
+Cache TF-IDF vectors in TinyDB to improve tag generation and search performance (store as pickled objects).
+Support Additional File Types
+Add support for .md files using the markdown library (if bundled) to extract text, updating extract_text and file dialogs.
+Improve Image Handling
+Allow manual association of external images with documents via a new "Associate Image" menu option.
+Use a tk.Canvas for image display to enable zooming/panning for large images.
+Enhance Performance and Robustness
+Add try-except blocks in add_document and scan_folder to handle file operation errors and show user-friendly messages via messagebox.showerror.
+Process large documents in a separate thread using threading to keep the GUI responsive.
+Use TinyDB’s table feature (e.g., db.table("documents")) to optimize database queries.
+Add Accessibility Features
+Implement keyboard shortcuts (e.g., Ctrl+O for adding documents, Ctrl+F for search focus).
+Add a high-contrast theme toggle in the menu for accessibility.
+Provide User Guidance
+Add a "Help" menu with a messagebox.showinfo displaying basic instructions (e.g., how to add documents, search, or delete).
+Optimize Storage (Optional)
+Store embedded images as base64 strings in TinyDB instead of files in
