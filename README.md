@@ -139,4 +139,4 @@ Add a high-contrast theme toggle in the menu for accessibility.
 Provide User Guidance
 Add a "Help" menu with a messagebox.showinfo displaying basic instructions (e.g., how to add documents, search, or delete).
 Optimize Storage (Optional)
-Store embedded images as base64 strings in TinyDB instead of files in
+Store embedded images as base64 strings in TinyDB instead of files inimg_folder to reduce disk clutter, decoding them for display in show_image.
