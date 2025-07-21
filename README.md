@@ -1,100 +1,162 @@
 # Support Knowledge Bot
 
+# Retail Support Demo README
+
 ## Overview
-
-This is a Tkinter-based support chatbot that uses TinyDB to load a knowledge base extracted from Word (.docx) and PDF (.pdf) documents. It supports fuzzy keyword matching, synonym expansion, tag and file type filtering, chat history, quick FAQ buttons, and keyword highlighting.
-
-## Setup Instructions
-
-### Requirements
-
-- Python 3.7 or newer
-- Install dependencies:
-
-```bash
-pip install python-docx pdfplumber tinydb nltk fuzzywuzzy python-Levenshtein
-```
-
-- Download NLTK stopwords (run once in Python shell):
-
-```python
-import nltk
-nltk.download('stopwords')
-```
-
-### Prepare your documents
-
-- Put your `.docx` and `.pdf` troubleshooting documents in the `docs/` folder.
-
-### Index your documents
-
-Run the `index_documents.py` script to extract paragraphs, generate tags, and create the TinyDB JSON index:
-
-```bash
-python index_documents.py
-```
-
-### Run the chatbot
-
-Start the chatbot GUI with:
-
-```bash
-python support_bot.py
-```
-
-## Files
-
-- `index_documents.py` - Script to index your Word/PDF docs into TinyDB JSON.
-- `support_bot.py` - The Tkinter GUI chatbot application.
-- `synonyms.json` - JSON file containing synonym groups for better matching.
-- `docs/` - Folder for your knowledge base documents.
-- `data/` - Folder where the TinyDB JSON index is stored.
+The Retail Support Demo is an offline knowledge base application for managing and searching documents (TXT, PDF, DOCX) with support for embedded images. It allows users to add, organize, search, and view documents and associated images in a user-friendly GUI, all without requiring an internet connection.
 
 ## Features
+- **Document Management**: Add individual documents or scan folders to import TXT, PDF, or DOCX files.
+- **Image Support**: Extracts and displays embedded images from PDFs and DOCX files; supports external image association (JPG, JPEG, PNG).
+- **Search and Filter**: Search documents by content, name, or tags with case-sensitive and date range options; filter by tags or categories.
+- **Organization**: Categorize documents, sort by name, date, or category, and view metadata in tooltips.
+- **Image Navigation**: View multiple images with Prev/Next buttons, zoom (mouse wheel), and pan (drag).
+- **Accessibility**: Supports keyboard shortcuts, high-contrast mode, and screen reader-compatible widget labels.
+- **Database Management**: Export/import the database for backup or migration; handles database corruption on startup.
+- **Offline Operation**: Fully functional without internet access.
+- **Code Documentation**: The source code (`knowledge_base_app.py`) includes detailed comments explaining each section, function, and key logic block for easier understanding and maintenance.
 
-- Fuzzy search with synonym expansion.
-- Filter by tags and file types.
-- Highlighted matched keywords in responses.
-- Search history and quick FAQ buttons.
-- Export chat to a text file.
+## Requirements
+### Software
+- **Python 3.8+**: The app requires Python to run the script.
+- **Libraries** (must be installed or bundled):
+  - `tkinter`: For the GUI (includes `simpledialog` for category prompts).
+  - `tinydb`: For lightweight database storage.
+  - `python-docx`: For reading DOCX files.
+  - `PyMuPDF` (fitz): For reading PDF files and extracting images.
+  - `Pillow` (PIL): For image processing and display.
+  - `fuzzywuzzy`: For fuzzy search functionality.
+  - `scikit-learn`: For generating document tags via TF-IDF.
+- **Optional for Distribution**:
+  - Use `PyInstaller` to bundle the app and its dependencies into a standalone executable for offline use.
 
----
+### Hardware
+- **Operating System**: Windows, macOS, or Linux (tested on Windows).
+- **Disk Space**: At least 100 MB for the app, documents, and extracted images.
+- **Memory**: Minimum 2 GB RAM (more for large documents or databases).
 
-Explanation for Your Manager
-What is this app?
-It’s a lightweight, offline chatbot designed to assist support agents by quickly searching through troubleshooting documents (Word, PDF) to find relevant solutions.
+### Installation
+1. **Install Python**: Ensure Python 3.8 or higher is installed. Download from [python.org](https://www.python.org/downloads/).
+2. **Install Dependencies**: Use pip to install required libraries:
+   ```bash
+   pip install tinydb python-docx PyMuPDF Pillow fuzzywuzzy scikit-learn
 
-How does it work?
 
-It indexes all your existing knowledge base documents into a searchable database.
+Run the App: Execute the Python script (knowledge_base_app.py):python knowledge_base_app.py
 
-When you type in a question or issue, the bot uses fuzzy keyword matching to find the most relevant information.
 
-It highlights keywords in the results and allows filtering by topics or file type for faster lookup.
+Optional Standalone Executable:
+Install PyInstaller: pip install pyinstaller
+Create an executable: pyinstaller --onefile knowledge_base_app.py
+Distribute the generated executable in the dist folder for offline use.
 
-The interface is user-friendly with search history and quick FAQ buttons for common issues.
 
-Why offline?
 
-No dependency on internet connectivity or cloud services, so it’s secure and works anywhere, even without network access.
+Folder Structure
+The app creates and uses the following folder structure in the same directory as the script:
+knowledge_base_app/
+├── knowledge_base.json    # TinyDB database storing document metadata, tags, categories, and image references
+├── kb_documents/          # Stores imported document files (TXT, PDF, DOCX)
+├── images/                # Stores extracted images from documents and manually associated images
+└── app.log                # Log file for debugging errors
 
-All data stays on the local machine, ensuring confidentiality.
 
-Can it be updated?
+knowledge_base.json: Contains document metadata (name, content, tags, images, category, creation date, TF-IDF vectors).
+kb_documents/: Stores copies of imported documents to ensure offline access.
+images/: Stores images extracted from PDFs/DOCX files (e.g., docname_page0_img0.png) and external images (e.g., docname.jpg).
+app.log: Logs errors and events for debugging (e.g., file processing errors, database issues).
 
-Yes! Adding new troubleshooting documents is as simple as placing them in a folder and running a script that updates the searchable database.
+Note: Ensure write permissions for the app directory to create these files and folders.
+How to Use
+Starting the App
 
-This keeps the knowledge base current without complex retraining or AI model updates.
+Run knowledge_base_app.py or the standalone executable.
+On startup, the app checks the database integrity. If corrupted, it prompts to clear the database or continue with limited functionality.
 
-Benefits for the team:
+Adding Documents
 
-Speeds up response times by providing immediate access to relevant troubleshooting steps.
+Add Individual Documents:
+Go to File > Add KB Document (or press Ctrl+O).
+Select one or more TXT, PDF, or DOCX files.
+A dialog will prompt for a category for each document; enter a category or leave blank for "Uncategorized".
+The app extracts text and up to 5 embedded images per document, storing them in kb_documents and images folders.
 
-Reduces repetitive manual searching across multiple documents.
 
-Easy to maintain and expand with new documents.
+Scan Folder:
+Go to File > Scan Document Folder.
+Select a folder containing TXT, PDF, or DOCX files.
+A dialog will prompt for a category for each document; enter a category or leave blank for "Uncategorized".
+The app imports non-duplicate files and extracts text/images.
 
-No costly AI infrastructure or ongoing cloud fees.
+
+
+Viewing Documents
+
+Select a document from the listbox on the left to view its content in the text preview area.
+Embedded or associated images appear in the canvas below the text.
+Use Prev/Next buttons to cycle through multiple images.
+Zoom images with the mouse wheel; pan by clicking and dragging.
+Hover over a document in the listbox to see a tooltip with metadata (name, tags, category, creation date).
+
+Searching Documents
+
+Enter a query in the search bar (bottom) and press Enter or click Search.
+Filters:
+Tag Filter: Select a tag from the dropdown to limit results to documents with that tag.
+Category Filter: Select a category to filter documents.
+Date Range: Enter start/end dates (YYYY-MM-DD) to filter by creation date.
+Case Sensitive: Check the box for case-sensitive searches.
+
+
+Results appear in the listbox; the top result’s content is displayed with highlighted matches.
+Click Clear to reset the search and show all documents.
+
+Managing Documents
+
+Delete Documents: Right-click one or more selected documents in the listbox and choose Delete. This removes the document and its images from kb_documents and images.
+Associate Image: Go to File > Associate Image, select a document, and choose a JPG, JPEG, or PNG file to link to it.
+Sort Documents: Use the sort dropdown to order documents by name, creation date, or category.
+View All Documents: Go to File > View All Documents to see a list of all document names.
+
+Customizing Display
+
+Word Wrap: Toggle the Word Wrap checkbox to enable/disable text wrapping in the preview.
+Font Size: Use +/- buttons to adjust the text preview font size.
+High-Contrast Mode: Go to File > Toggle High Contrast for better visibility.
+Image Navigation: Zoom (mouse wheel) and pan (drag) images in the canvas.
+
+Database Management
+
+Export Database: Go to File > Export Database to save knowledge_base.json to a chosen location.
+Import Database: Go to File > Import Database to load a previously exported JSON file, replacing the current database.
+
+Accessibility
+
+Use Ctrl+O to add documents and Ctrl+F to focus the search bar.
+Widgets (search bar, tag/category filters) have accessible names for screen readers (e.g., NVDA).
+Test with screen readers to ensure compatibility, as Tkinter’s support is limited.
+
+Help
+
+Go to File > Help for detailed instructions on using the app.
+
+Troubleshooting
+
+Database Errors: If the app reports a corrupted database, choose to clear it or restore from a backup (exported JSON file).
+Missing Documents/Images: Ensure kb_documents and images folders have write permissions.
+Performance Issues: For large documents, the app limits image extraction to 5 per file. Use a smaller set of documents if performance is slow.
+Errors: Check app.log for detailed error messages. For example, if you see "module tkinter.filedialog has no attribute 'askstring'", ensure you are using the updated code with simpledialog.askstring.
+Code Understanding: The source code includes detailed comments for each section, function, and key logic block to aid developers in understanding and maintaining the app.
+
+Notes
+
+Offline Operation: The app requires no internet access. All dependencies must be bundled for standalone use.
+Distribution: Use PyInstaller to create a standalone executable for users without Python installed.
+Testing: Test with various document types (TXT, PDF, DOCX), large files, and embedded images. Verify search, sorting, and filtering with large databases. Test category prompts to ensure they work correctly.
+Storage: Images are stored in images to keep the database lightweight. Consider base64 encoding in TinyDB if disk usage is a concern (requires code modification).
+Limitations: Markdown (.md) support is not included to avoid additional dependencies. Add the markdown library if needed.
+
+For issues or feature requests, consult app.log or contact the developer.```
 
 #Prompt to make app
 
