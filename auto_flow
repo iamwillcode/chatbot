@@ -1,1 +1,290 @@
+Awesome—here’s the complete, end-to-end flow you asked for, written for the new Power Automate designer and using only standard Teams + SharePoint + Microsoft Lists actions (no premium). It:
 
+Watches a Teams channel for new posts
+
+Reads From (Affected User), Subject → Issue, Body → Description
+
+Detects attachments (to flag Screenshot Attached?)
+
+Creates a row in Combined Log
+
+Fills your new Link to user message (Hyperlink) with the Teams message link
+
+Posts an Adaptive Card to your Tech Support chat
+
+On Work in Progress, sets Agent Name (Person) and posts follow-ups
+
+Adds a 📝 Open List Item button so techs can edit Resolution/Notes (and later swap to Power Apps)
+
+Flow: Teams → Combined Log → Adaptive Card → Assign on click
+0) Trigger
+
+Create → Automated cloud flow
+Trigger: Microsoft Teams — When a new channel message is added (V3)
+
+Team: your team (e.g., Support)
+
+Channel: your channel (e.g., Anita)
+
+1) Initialize variables (6)
+
+Add Initialize variable (six times):
+
+varMessageLink — String — (blank)
+
+varHasAttachment — Boolean — false
+
+varAffectedUser — String — (blank)
+
+varIssue — String — (blank) ← will hold Subject (or fallback)
+
+varDescription — String — (blank) ← will hold clean Body (or fallback)
+
+varListItemId — String — (blank)
+
+2) Get message details
+
+Action: Microsoft Teams — Get message details (V3)
+
+Message ID: Message ID (from trigger)
+
+Team/Channel: same as trigger
+
+Action: Set variable
+
+Name: varMessageLink
+
+Value: Link to message (from Get message details (V3))
+
+Action: Set variable
+
+Name: varAffectedUser
+
+Value: From Display Name (from Get message details (V3))
+
+3) Build safe Issue (Subject) & Description (Body)
+
+Teams “Subject” is present for new conversation posts; replies often have no subject. We’ll safely fallback.
+
+Action: Compose — RawSubject → Dynamic content: Subject (from Get message details)
+Action: Compose — RawBody → Dynamic content: Body (from Get message details)
+
+Action: Compose — SafeIssue (Expression)
+
+if(
+  not(empty(outputs('Compose_-_RawSubject'))),
+  outputs('Compose_-_RawSubject'),
+  '—'        /* fallback: em dash to mark “no subject” */
+)
+
+
+Action: Compose — SafeDescription (Expression)
+
+if(
+  not(empty(outputs('Compose_-_RawBody'))),
+  outputs('Compose_-_RawBody'),
+  '(no message text)'
+)
+
+
+(Optional tidy-up for HTML → readable text)
+Action: Compose — CleanDescription (Expression)
+
+replace(
+  replace(
+    replace(
+      replace(
+        replace(outputs('Compose_-_SafeDescription'), '<br>', '\n'),
+      '<br/>', '\n'),
+    '</div>', '\n'),
+  '<div>', ''),
+'&nbsp;', ' ')
+
+
+Action: Set variable → varIssue = Outputs of Compose — SafeIssue
+Action: Set variable → varDescription = Outputs of Compose — CleanDescription
+(If you don’t want the cleanup, use SafeDescription instead.)
+
+4) Detect if any attachments were posted
+
+Action: Condition (single boolean)
+Expression:
+
+length(triggerOutputs()?['body/attachments']) > 0
+
+
+True branch: Set variable varHasAttachment = true
+
+False branch: do nothing
+
+(We’re not fetching files; just flagging so Screenshot Attached? is correct.)
+
+5) Create Combined Log item
+
+Action: SharePoint — Create item
+
+Site Address: your site (e.g., https://<tenant>.sharepoint.com/sites/<YourSite>)
+
+List Name: Combined Log
+
+Map the columns like this:
+
+Column (your list)	Mapping
+Affected User Name (Text)	variables('varAffectedUser')
+Microsoft Ticket (Text)	(leave blank or parse pattern later)
+Agent Name (Person)	(leave blank — set on click)
+Date Reported (Date/Time)	Expression: utcNow()
+Issue (Choice/Text)	variables('varIssue')
+Description (Multiline)	variables('varDescription')
+Screenshot (Hyperlink)	(leave URL blank for now or set to a placeholder)
+Screenshot Attached? (Yes/No)	variables('varHasAttachment')
+Resolution (Multiline)	(leave blank; tech edits)
+Extra Notes (Multiline)	(leave blank; tech edits)
+Logged on Issues Tab? (Yes/No)	(as you wish)
+Resolved 1st Call? (Yes/No)	(leave blank)
+Link to user message (Hyperlink)	Url = variables('varMessageLink'), Description = Open Teams message
+
+For Hyperlink fields, Power Automate shows subfields Url and Description once you click the column.
+
+Action: Set variable
+
+Name: varListItemId
+
+Value: ID (from Create item)
+
+6) Build a direct link to the list item (for techs to edit now)
+
+(You can swap this later for a Power Apps deep link.)
+
+Action: Initialize variable (one time at top if you prefer):
+
+varSiteUrl — String — https://<tenant>.sharepoint.com/sites/<YourSite>
+
+Action: Compose — ListItemUrl (Expression)
+
+concat(
+  variables('varSiteUrl'),
+  '/Lists/Combined%20Log/EditForm.aspx?ID=',
+  variables('varListItemId')
+)
+
+
+If your list URL segment differs, encode spaces (%20) and adjust the list name in the path. Use DispForm.aspx for read-only.
+
+7) Post the Adaptive Card to the Tech Support chat (and wait)
+
+Action: Microsoft Teams — Post adaptive card and wait for a response
+
+Post as: Flow bot
+
+Post in: Group chat (your Tech Support / Juniors chat)
+
+Message (JSON) — paste, then click into ${…} placeholders to insert Dynamic content / Expressions.
+
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    { "type": "TextBlock", "text": "🚨 New issue posted in the Tenant migration - Support", "weight": "Bolder", "size": "Medium" },
+
+    { "type": "TextBlock", "text": "From: ${FromName}", "wrap": true, "spacing": "Small" },
+
+    { "type": "TextBlock", "text": "", "spacing": "Small" },
+    { "type": "TextBlock", "text": "Issue:", "weight": "Bolder", "spacing": "None" },
+    { "type": "TextBlock", "text": "${IssueText}", "wrap": true },
+
+    { "type": "TextBlock", "text": "", "spacing": "Small" },
+    { "type": "TextBlock", "text": "Message:", "weight": "Bolder", "spacing": "None" },
+    { "type": "TextBlock", "text": "${DescriptionText}", "wrap": true },
+
+    { "type": "TextBlock", "text": "", "spacing": "Small" },
+    { "type": "TextBlock", "text": "Tech Team: An, Mi, Ph, Ja, Wi – please assist.", "wrap": true, "isSubtle": true }
+  ],
+  "actions": [
+    { "type": "Action.OpenUrl", "title": "🔗 View message", "url": "${MessageURL}" },
+    { "type": "Action.OpenUrl", "title": "📝 Open List Item", "url": "${ListItemUrl}" },
+    { "type": "Action.Submit", "title": "🛠️ Work in Progress", "data": { "action": "assignToMe", "listItemId": "${ListItemID}" } }
+  ]
+}
+
+
+Bind:
+
+${FromName} → From Display Name (Get message details) or variables('varAffectedUser')
+
+${IssueText} → variables('varIssue')
+
+${DescriptionText} → variables('varDescription')
+
+${MessageURL} → variables('varMessageLink')
+
+${ListItemUrl} → Outputs of Compose — ListItemUrl
+
+${ListItemID} → variables('varListItemId')
+
+8) When Work in Progress is clicked → set Agent + notify
+
+Action: Condition
+Expression:
+
+equals(body('Post_adaptive_card_and_wait_for_a_response')?['data']?['action'],'assignToMe')
+
+True branch:
+
+SharePoint — Update item (Combined Log)
+
+Id: variables('varListItemId')
+
+Agent Name (Person) = Expression (claims)
+
+concat(
+  'i:0#.f|membership|',
+  body('Post_adaptive_card_and_wait_for_a_response')?['responder']?['userPrincipalName']
+)
+
+
+(If your tenant accepts raw UPN in Person fields, you can set the UPN directly instead of claims.)
+
+Teams — Post message (Group chat: Tech Support)
+
+🛠️ @{body('Post_adaptive_card_and_wait_for_a_response')?['responder']?['displayName']} is working on the issue.
+🔗 Original: @{variables('varMessageLink')}
+
+
+Teams — Reply with a message in a channel (same Team/Channel; Message ID from trigger)
+
+🛠️ A technician is now working on your issue. We’ll keep you updated!
+
+
+(False branch: do nothing.)
+
+9) What gets filled automatically (out of the box)
+
+Affected User Name → from Teams “From”
+
+Issue → message Subject (or “—” if none)
+
+Description → message Body (or “(no message text)”; lightly cleaned)
+
+Screenshot Attached? → true/false based on presence of attachments
+
+Link to user message → direct Teams thread URL
+
+Date Reported → utcNow()
+
+Agent Name → set automatically when tech clicks Work in Progress
+
+Resolution / Extra Notes → tech fills manually (via 📝 Open List Item, later via Power Apps)
+
+If you also want Microsoft Ticket auto-filled (e.g., pattern like TCKT-12345 inside the message), we can add a tiny Compose to extract it with split()/indexOf().
+
+10) Quick test checklist
+
+Post with subject & body → Issue=subject, Description=body, Link to user message set, Screenshot Attached? reflects attachments, Card lands with 3 buttons.
+
+Post with body only → Issue=“—”, Description=body (clean), everything else same.
+
+Post with only screenshot → Issue=“—”, Description=“(no message text)”, Screenshot Attached?=true, Link to user message set, Card still fine.
+
+Click 🛠️ Work in Progress → Agent Name populates in the list, chat + channel notifications fire, 📝 Open List Item opens the list form.
