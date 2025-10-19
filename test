@@ -17,60 +17,64 @@ Resolved 1st Call?
 
 
 
-🔁 Power Automate Flow Logic
+flow Logic Breakdown
 Trigger:
 
-When a new message is posted in the Teams channel (e.g., Anita).
-
-Steps:
+When a new message is posted in the Teams channel.
 
 
-Check for attachments
+Step 1: Extract Message Info
 
-If the message contains an image:
+Get:
 
-Save it to a SharePoint document library.
-Get a shareable link.
-Set Screenshot Attached? = Yes
-Add the link to the Screenshot column.
-
-
-If no image:
-
-Set Screenshot Attached? = No
+Message text
+Sender name (Affected User)
+Attachments (check if image is present)
 
 
 
 
+Step 2: If Screenshot Exists
 
-Create a new item in the Microsoft List
+Save the image to your SharePoint document library
 
-Fill in: Affected User Name, Description, Screenshot link, Screenshot Attached?, Date Reported, etc.
+File name: AffectedUser_Screenshot_YYYY-MM-DD.png
+Metadata: Set “Affected User” column in the library
+
+
+Get the SharePoint link to the uploaded image
+
+
+Step 3: Create Microsoft List Item
+
+Fill in:
+
+Affected User Name
+Description (from message)
+Screenshot Attached? → Yes
+Screenshot → SharePoint link
+Date Reported → current date
 
 
 
-Send Adaptive Card to Tech Support Group Chat
+
+Step 4: Send Adaptive Card to Tech Support Group
 
 Include:
 
 Issue summary
-Button: “Work in Progress”
-Button: “View Screenshot” (if available)
+Button: “Work in Progress” → updates Agent Name in the list
+Button: “View Screenshot” → opens SharePoint image link
 
 
 
-
+Detect new user issues in Anita.
+Notify support with an adaptive card.
+Let techs click “Work in Progress”.
+Post a follow-up in the support team group chat, with the agent name that clicked on work in progress.
 
 When “Work in Progress” is clicked
 
 Capture the agent’s name
 Update the Agent Name column in the Microsoft List
 
-
-
-
-🧾 Adaptive Card JSON (with Screenshot Button)
-Here’s a sample Adaptive Card JSON you can use in Power Automate:
-JSON{  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",  "type": "AdaptiveCard",  "version": "1.5",  "body": [    {      "type": "TextBlock",      "text": "**New Issue Reported**",      "weight": "Bolder",      "size": "Medium"    },    {      "type": "TextBlock",      "text": "Affected User: ${AffectedUserName}",      "wrap": true    },    {      "type": "TextBlock",      "text": "Issue: ${Issue}",      "wrap": true    },    {      "type": "TextBlock",      "text": "Description: ${Description}",      "wrap": true    },    {      "type": "ActionSet",      "actions": [        {          "type": "Action.Submit",          "title": "Work in Progress",          "data": {            "action": "assignToMe",            "listItemId": "${ListItemID}"          }        },        {          "type": "Action.OpenUrl",          "title": "View Screenshot",          "url": "${ScreenshotURL}"        }      ]    }  ]}Show more lines
-
-Replace ${AffectedUserName}, ${Issue}, ${Description}, ${ScreenshotURL}, and ${ListItemID} with dynamic content from your flow.
