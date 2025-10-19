@@ -16,3 +16,7 @@ equals(
   ),
   'assignToMe'
 )
+
+
+
+Action 'Create_item' failed: The 'inputs.parameters' of workflow operation 'Create_item' of type 'OpenApiConnection' is not valid. Error details: Input parameter 'item/field_4' is required to be of type 'Number/double'. The runtime value '"Migration Portal Ready state error"' to be converted doesn't have the expected format 'Number/double'.
