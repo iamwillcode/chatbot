@@ -1,0 +1,18 @@
+Short answer: you can only combine into one flow if the screenshot is already in SharePoint (or in the Teams channel Files folder) at trigger time.
+Given your constraints (no premium HTTP; users’ screenshots are not stored in the Teams channel folder), the screenshot cannot be pulled out of the Teams message and copied into your library in a single flow. The Teams trigger does not give you the file bytes, and without HTTP/Graph you can’t fetch them.
+
+What this means for your two questions
+
+“Why not combine Flow 1 and 2?”
+
+Combine them only if you change the process so the screenshot is uploaded to your SharePoint library (or the channel’s Files folder) before/at the time of the message. Then one flow can pick up that file/link and write it to the List + Card.
+
+With the current process (inline/attached in a post that isn’t saved to a SharePoint folder you can read), a single flow can’t get the actual image. That’s why the “message record” link pattern + the separate library watcher (Flow 2) is reliable and 100% standard connectors.
+
+“When a user posts with a screenshot, does that screenshot get added to the library and the List?”
+
+As-is: No — not automatically, because it’s not in a SharePoint folder the flow can read. Flow 1 will create the message record file (so you always have a SharePoint link) and mark Screenshot Attached? = true.
+
+With Flow 2: As soon as someone (user/tech) uploads the actual screenshot to your library, Flow 2 will update the same List item so Screenshot points to the real image (and keep Screenshot Attached? = true).
+
+If you want it in one flow: Change the process so the screenshot is uploaded to your library (or channel Files) first. Then the one flow can: detect the message, find the corresponding file in SharePoint (by name, by Affected User, or by a pasted link), set Screenshot to that file’s link, and send the card with a working “View Screenshot” button.
