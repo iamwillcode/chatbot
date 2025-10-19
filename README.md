@@ -1,229 +1,297 @@
-🧱 Step-by-Step Setup for Microsoft Lists
-1. Create the List
+0) Trigger
 
-Go to Microsoft Lists or open it from SharePoint or Teams.
-Click “New List” > Blank List.
-Name it something like Post-Migration Issues.
+Create → Automated cloud flow
+Trigger: Microsoft Teams — When a new channel message is added (V3)
 
-2. Add Columns
-Match the columns from your Excel sheet:
-For the Issues List:
+Team: (your team)
 
-Affected User Name (Text)
-Microsoft Ticket (Text)
-Agent Name (Person or Text)
-Date Reported (Date)
-Issue (Choice or Text)
-Description (Multiline Text)
-Screenshot (Hyperlink or Attachment)
-Resolution (Multiline Text)
-Extra Notes (Multiline Text)
+Channel: (e.g., Anita)
 
-Optional: Create a second list for Call Logs with its own columns.
-3. Customize the Form
+1) Variables (7)
 
-Click “New Item” to see the default form.
-Use the “Customize with Power Apps” option to build a cleaner, more user-friendly form.
-You can add logic like:
+Add Initialize variable ×7 (Name / Type / Value):
 
-Required fields
-Conditional visibility
-Pre-filled agent name based on login
+varMessageLink / String / (blank)
 
+varHasImage / Boolean / false
 
+varFileName / String / (blank)
 
-4. Automate with Power Automate
+varFileExt / String / (blank)
 
-Trigger a flow when a new item is added.
-Actions could include:
+varAffectedUser / String / (blank)
 
-Sending a Teams message to your support group
-Logging the issue in another list
-Sending a confirmation email
+varScreenshotURL / String / (blank)
 
+varListItemId / String / (blank)
 
+2) Extract message info
 
+Action: Teams — Get message details (V3)
 
-🧠 Tips
+Message ID: Message ID (from trigger)
 
-You can embed the form in Teams for easy access.
-Use views and filters to track unresolved issues or first-call resolutions.
-Attach screenshots directly to the list item if needed.
+Team/Channel: same as trigger
 
+Action: Set variable → varMessageLink = Link to message (from Get message details)
+Action: Set variable → varAffectedUser = From Display Name (from Get message details)
 
-Would you like help building the list structure or designing the Power Apps form? I can guide you through it or even generate a sample schema for you to import.
+We’ll reuse varAffectedUser for the file name and list fields.
 
-Upload the Excel file to SharePoint or OneDrive.
-Go to Microsoft Lists > New List > From Excel.
-Select the sheet you want to import (e.g., Post-Migration Issues).
-Confirm column types and complete the import.
-Repeat for the Call Log sheet if needed.
+3) Check attachments (any?)
 
+Action: Condition (boolean expression):
 
-🔁 Power Automate Flow Overview
-Trigger:
+length(triggerOutputs()?['body/attachments']) > 0
 
-When a new message is posted in the designated Teams channel (e.g., Anita).
 
-Steps:
+True branch = has at least one attachment
 
+False branch = no attachment
 
-Check for attachments or images
+4) TRUE branch → find the first image and capture its filename
 
-If the message contains a screenshot → set Screenshot Attached? = Yes
-Else → set Screenshot Attached? = No
+Action: Apply to each
 
+Input: Attachments (from the trigger)
 
+Inside the loop:
 
-Create a new item in the Microsoft List
+Condition (is attachment an image?)
 
-Fill in: Affected User Name, Description, Screenshot link (if any), Screenshot Attached?, Date Reported, etc.
+startsWith(coalesce(items('Apply_to_each')?['contentType'],''),'image')
 
 
+If True:
 
-Send an Adaptive Card to the Tech Support Group Chat
+Set variable → varHasImage = true
 
-Card includes:
+Set variable → varFileName = (Expression)
 
-Issue summary
-Screenshot preview (if available)
-Button: “Work in Progress”
+coalesce(items('Apply_to_each')?['name'],'attachment')
 
 
-When clicked:
+Set variable → varFileExt = (Expression)
 
-Capture the agent's name
-Update the Agent Name column in the Microsoft List
+last(split(variables('varFileName'),'.'))
 
 
+If False: do nothing
 
+You only need the first image; it’s fine if the last wins in the loop.
 
+5) TRUE branch → try to save the image into your library
 
+We’ll attempt to read the bytes from the Team’s channel folder (where Teams stores message attachments) and create a copy in your library sjrb migration screenshots.
+If we can’t read it (e.g., it wasn’t stored in Files), we’ll gracefully fall back in Step 6.
 
-🧱 Power Apps Integration (Optional but Powerful)
-You can build a Power Apps form on top of the Microsoft List to:
+Condition (boolean):
 
-View and edit issues in a clean UI
-Filter by unresolved issues or assigned agents
-Upload screenshots manually if needed
-Add resolution notes
+and(variables('varHasImage'), not(empty(variables('varFileName'))))
 
-🧠 Recommendation for Your Flow
-Since you're already storing issues in a Microsoft List:
+If True → attempt copy into your library
 
-Store screenshots in SharePoint.
-Include the SharePoint link in the list item.
-Use that link in the Adaptive Card with a “View Screenshot” button.
+SharePoint — Get file content using path (attempt #1)
 
+Site Address: the Team’s site behind the channel (use “Open in SharePoint” from that channel’s Files tab once to confirm)
 
+File Path (Expression):
 
+concat('/Shared Documents/Anita/', variables('varFileName'))
 
-Monitors the ita Teams channel for user issues.
-Sends an adaptive card to the ETOC Juniors group chat.
-Lets techs click Work in Progress.
-Posts a follow-up message in the group chat.
-Replies to the original user message in Anita channel.
 
+(If your tenant uses /Documents/Anita/, add a second “Get file content using path” with that path and set fallback run-after as below.)
 
-🛠️ Manual Setup Guide in Power Automate
+SharePoint — Create file (your Support site where the destination library lives)
 
-🔹 Step 1: Trigger – When a new channel message is added
+Site Address: your site (e.g., https://contoso.sharepoint.com/sites/Support)
 
-Create a new Automated cloud flow.
-Search for and select:
-Microsoft Teams → When a new channel message is added
-Configure:
+Folder Path: /sjrb migration screenshots/
 
-Team: Select the team that contains the Anita channel
-Channel: Select Anita
+File Name (Expression):
 
+concat(
+  replace(variables('varAffectedUser'),' ','_'),
+  '_Screenshot_',
+  formatDateTime(utcNow(),'yyyy-MM-dd'),
+  '.',
+  variables('varFileExt')
+)
 
 
+File Content: File Content (from Get file content using path)
 
-🔹 Step 2: Get Message Details
+SharePoint — Update file properties (tag your custom column)
 
-Add action:
-Microsoft Teams → Get message details
-Configure:
+Library Name: sjrb migration screenshots
 
-Message ID: Use dynamic content:
-Message ID from the trigger
+Id: ID (from Create file)
 
+Affected User: variables('varAffectedUser')
 
+SharePoint — Get file metadata
 
+File Identifier: Identifier (from Create file)
 
-🔹 Step 3: Post Adaptive Card and Wait for a Response
+Set variable → varScreenshotURL = Link to item (from Get file metadata)
 
-Add action:
-Microsoft Teams → Post adaptive card and wait for a response
-Configure:
+Run-after (important):
+
+On Create file, set Configure run after to also run after failure of the first Get file content (so you can add an attempt #2 with /Documents/… if needed).
+
+If both attempts fail, we’ll fall back in Step 6.
+
+If False → skip to Step 6 (no usable image)
+6) Fallback (runs when there’s no image or we couldn’t read it)
+
+We still create a message record file in your library so the card/list always have a SharePoint link (never a Graph URL).
+
+Compose — MessageRecordContent (Expression)
+
+concat(
+  'From: ', variables('varAffectedUser'), '\n',
+  'Posted (UTC): ', utcNow(), '\n',
+  'Original Message Link: ', variables('varMessageLink'), '\n\n',
+  'Message Body:\n', outputs('Get_message_details_(V3)')?['body']
+)
+
+
+SharePoint — Create file (your site)
+
+Folder Path: /sjrb migration screenshots/
+
+File Name (Expression):
+
+concat(
+  replace(variables('varAffectedUser'),' ','_'),
+  '_Message_',
+  formatDateTime(utcNow(),'yyyy-MM-dd'),
+  '.txt'
+)
+
+
+File Content: Outputs of Compose — MessageRecordContent
+
+SharePoint — Update file properties
+
+Library Name: sjrb migration screenshots
+
+Id: ID (from Create file)
+
+Affected User: variables('varAffectedUser')
+
+SharePoint — Get file metadata
+
+File Identifier: Identifier (from Create file)
+
+Set variable → varScreenshotURL = Link to item (from Get file metadata)
+
+This gives you a valid SharePoint link even without an image.
+
+7) Create the Combined Log item
+
+Action: SharePoint — Create item
+
+List: Combined Log
+
+Map:
+
+Affected User Name → variables('varAffectedUser')
+
+Description → Body (from Get message details)
+
+Screenshot Attached? → variables('varHasImage')
+
+Screenshot (Hyperlink) → Url = variables('varScreenshotURL'), Description = Open Item
+
+Date Reported → Expression utcNow()
+
+(Others as needed)
+
+Set variable → varListItemId = ID (from Create item)
+
+8) Post the Adaptive Card to your support chat
+
+We’ll show View Screenshot only when we actually have a link (we do—either an image file or the message record).
+
+Condition (optional safety):
+
+not(empty(variables('varScreenshotURL')))
+
+
+True → Post adaptive card and wait for a response
 
 Post as: Flow bot
-Post in: Group chat
-Group chat:  Juniors
+
+Post in: Group chat (your support chat)
+
+Message (JSON) — paste, then bind the placeholders as noted:
+
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    { "type": "TextBlock", "text": "**New Issue Reported**", "weight": "Bolder", "size": "Medium" },
+    { "type": "TextBlock", "text": "Affected User: ${AffectedUserName}", "wrap": true },
+    { "type": "TextBlock", "text": "Description: ${Description}", "wrap": true }
+  ],
+  "actions": [
+    { "type": "Action.Submit", "title": "Work in Progress", "data": { "action": "assignToMe", "listItemId": "${ListItemID}" } },
+    { "type": "Action.OpenUrl", "title": "View Screenshot", "url": "${ScreenshotURL}" },
+    { "type": "Action.OpenUrl", "title": "View Original Message", "url": "${MessageURL}" }
+  ]
+}
 
 
-Thanks! We've noted you're working on this issue. 🛠️
+Bind:
+
+${AffectedUserName} → variables('varAffectedUser')
+
+${Description} → Body (Get message details)
+
+${ListItemID} → variables('varListItemId')
+
+${ScreenshotURL} → variables('varScreenshotURL')
+
+${MessageURL} → variables('varMessageLink')
+
+(If you want an Issue line too, add it in your list + mapping.)
+
+9) On Work in Progress → set Agent Name (Person) + post follow-ups
+
+Condition:
+
+equals(body('Post_adaptive_card_and_wait_for_a_response')?['data']?['action'],'assignToMe')
 
 
+True branch:
+
+SharePoint — Update item (Combined Log)
+
+Id: variables('varListItemId')
+
+Agent Name (Person) = claims (Expression):
+
+concat(
+  'i:0#.f|membership|',
+  body('Post_adaptive_card_and_wait_for_a_response')?['responder']?['userPrincipalName']
+)
 
 
+(If your tenant accepts plain UPN, you can instead use the UPN value directly.)
+
+Teams — Post message in a chat or channel (Group chat: your support chat)
+
+🛠️ @{body('Post_adaptive_card_and_wait_for_a_response')?['responder']?['displayName']}
+is working on the issue.
+🔗 Original: @{variables('varMessageLink')}
 
 
-🔹 Step 4: Condition – Check Button Click
+Teams — Reply with a message in a channel
 
-Add action:
-Control → Condition
-Configure:
+Message ID: from the trigger
 
-Expression:
-     equals(triggerOutputs()?['body/data/action'], 'workInProgress')
-
-
-
-
-
-🔹 Step 5a: Post Follow-Up Message in Juniors Group Chat
-
-Inside the “If yes” branch, add action:
-Microsoft Teams → Post message in a chat or channel
-Configure:
-
-Post as: Flow bot
-Post in: Group chat
-Group chat: ETOC Juniors
 Message:
 
-🛠️ @{triggerOutputs()?['body/responder']['displayName']} is working on the issue.🔗 View original message?['body/webUrl']})
-
-
-
-
-🔹 Step 5b: Reply to Original Message in ita Channel
-
-Add another action inside the “If yes” branch:
-Microsoft Teams → Reply with a message in a channel
-Configure:
-
-Post as: Flow bot
-Post in: Channel
-Team: Select the team with the Anita channel
-Channel: ita
-Message ID: Use dynamic content:
-Message ID from the trigger
-Message:
-       🛠️ A technician is now working on your issue. We'll keep you updated!
-
-
-
-
-
-✅ Done!
-Your flow is now complete. It will:
-
-Detect new user issues in ita.
-Notify  Juniors with an adaptive card.
-Let techs click “Work in Progress”.
-Post a follow-up in the group chat.
-Reply to the original user message in ta.
-
+🛠️ A technician is now working on your issue. We’ll keep you updated!
