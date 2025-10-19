@@ -16,3 +16,20 @@ As-is: No — not automatically, because it’s not in a SharePoint folder the f
 With Flow 2: As soon as someone (user/tech) uploads the actual screenshot to your library, Flow 2 will update the same List item so Screenshot points to the real image (and keep Screenshot Attached? = true).
 
 If you want it in one flow: Change the process so the screenshot is uploaded to your library (or channel Files) first. Then the one flow can: detect the message, find the corresponding file in SharePoint (by name, by Affected User, or by a pasted link), set Screenshot to that file’s link, and send the card with a working “View Screenshot” button.
+
+
+
+🚨 New issue posted in the Tenant migration- Support
+From: john doe
+Message: Can I ask if the legacy application Netdoc was tested?  This is extensively used by the NOC teams.  Need to make sure it works before migrating.
+Tech Team: Andrew, Mitch, Philip, James, William – please assist.
+🔗 View message
+🛠️ Work in Progress
+
+
+🚨 New issue posted in the Tenant migratio - Support
+From: jogn doe
+Message: I am looking to receive some help as I have completed my migration to our new VPN. Since the migration I am unable to access certain applications to help my customers. I have been provided instructions pertaining to signing in 
+Tech Team: Andrew, Mitch, Philip, James, William – please assist.
+🔗 View message
+🛠️ Work in Progress
