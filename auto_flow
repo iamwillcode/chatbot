@@ -16,6 +16,10 @@ On Work in Progress, sets Agent Name (Person) and posts follow-ups
 
 Adds a 📝 Open List Item button so techs can edit Resolution/Notes (and later swap to Power Apps)
 
+
+
+
+
 Flow: Teams → Combined Log → Adaptive Card → Assign on click
 0) Trigger
 
