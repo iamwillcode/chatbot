@@ -1,55 +1,229 @@
-IP Calculator
+🧱 Step-by-Step Setup for Microsoft Lists
+1. Create the List
 
-Purpose: The IP Calculator is an Excel tool used to ping and check the status of various network devices in retail stores. It helps determine if devices are online or offline and provides quick access to device interfaces.
+Go to Microsoft Lists or open it from SharePoint or Teams.
+Click “New List” > Blank List.
+Name it something like Post-Migration Issues.
 
-Tabs:
+2. Add Columns
+Match the columns from your Excel sheet:
+For the Issues List:
 
-· IP Calculator MERAKI - For stores using the new Meraki network setup.
+Affected User Name (Text)
+Microsoft Ticket (Text)
+Agent Name (Person or Text)
+Date Reported (Date)
+Issue (Choice or Text)
+Description (Multiline Text)
+Screenshot (Hyperlink or Attachment)
+Resolution (Multiline Text)
+Extra Notes (Multiline Text)
 
-· IP Calculator RIAB - For stores using the old (Legacy) network setup.
+Optional: Create a second list for Call Logs with its own columns.
+3. Customize the Form
 
-Usage:
+Click “New Item” to see the default form.
+Use the “Customize with Power Apps” option to build a cleaner, more user-friendly form.
+You can add logic like:
 
-1. Enter Store Number: Input the store number in the designated cell.
+Required fields
+Conditional visibility
+Pre-filled agent name based on login
 
-2. Ping Devices: Click the "Ping" button to check the status of devices. The IP addresses will update based on the store number entered.
 
-3. Ping Range: Use the "Ping Range" button to ping all devices within a specific range, including DHCP devices.
 
-4. Clear Results: Use the "Clear" button to reset the results.
+4. Automate with Power Automate
 
-Device Status:
+Trigger a flow when a new item is added.
+Actions could include:
 
-· Online: Devices that respond to the ping will be marked as online.
+Sending a Teams message to your support group
+Logging the issue in another list
+Sending a confirmation email
 
-· Offline: Devices that do not respond will be marked as offline.
 
-Device Types:
 
-· Static IP Devices: Includes fixed tills, printers, and other network equipment.
 
-· DHCP Devices: Typically includes pin pads and tablets.
+🧠 Tips
 
-Accessing Device Interfaces:
+You can embed the form in Teams for easy access.
+Use views and filters to track unresolved issues or first-call resolutions.
+Attach screenshots directly to the list item if needed.
 
-· Highlight IP: Select the IP address of the device.
 
-· Open in Browser: Click the "Open in Browser" button to access the device's web interface for further troubleshooting.
+Would you like help building the list structure or designing the Power Apps form? I can guide you through it or even generate a sample schema for you to import.
 
-Network Differences:
+Upload the Excel file to SharePoint or OneDrive.
+Go to Microsoft Lists > New List > From Excel.
+Select the sheet you want to import (e.g., Post-Migration Issues).
+Confirm column types and complete the import.
+Repeat for the Call Log sheet if needed.
 
-· Legacy Network: Uses 10.229.x.x IP addresses.
 
-· Meraki Network: Uses 10.8.x.x IP addresses.
+🔁 Power Automate Flow Overview
+Trigger:
 
-Troubleshooting:
+When a new message is posted in the designated Teams channel (e.g., Anita).
 
-· Store Offline: If all devices are offline, the store may have a network issue.
+Steps:
 
-· Device-Specific Issues: If only certain devices are offline, further investigation into those specific devices is needed.
 
-Additional Notes:
+Check for attachments or images
 
-· Periodic Updates: The IP Calculator will be updated periodically to reflect changes in the network setup.
+If the message contains a screenshot → set Screenshot Attached? = Yes
+Else → set Screenshot Attached? = No
 
-· Use on VPN: Ensure you are connected to the VPN when using the IP Calculator for accurate results. 
+
+
+Create a new item in the Microsoft List
+
+Fill in: Affected User Name, Description, Screenshot link (if any), Screenshot Attached?, Date Reported, etc.
+
+
+
+Send an Adaptive Card to the Tech Support Group Chat
+
+Card includes:
+
+Issue summary
+Screenshot preview (if available)
+Button: “Work in Progress”
+
+
+When clicked:
+
+Capture the agent's name
+Update the Agent Name column in the Microsoft List
+
+
+
+
+
+
+🧱 Power Apps Integration (Optional but Powerful)
+You can build a Power Apps form on top of the Microsoft List to:
+
+View and edit issues in a clean UI
+Filter by unresolved issues or assigned agents
+Upload screenshots manually if needed
+Add resolution notes
+
+🧠 Recommendation for Your Flow
+Since you're already storing issues in a Microsoft List:
+
+Store screenshots in SharePoint.
+Include the SharePoint link in the list item.
+Use that link in the Adaptive Card with a “View Screenshot” button.
+
+
+
+
+Monitors the ita Teams channel for user issues.
+Sends an adaptive card to the ETOC Juniors group chat.
+Lets techs click Work in Progress.
+Posts a follow-up message in the group chat.
+Replies to the original user message in Anita channel.
+
+
+🛠️ Manual Setup Guide in Power Automate
+
+🔹 Step 1: Trigger – When a new channel message is added
+
+Create a new Automated cloud flow.
+Search for and select:
+Microsoft Teams → When a new channel message is added
+Configure:
+
+Team: Select the team that contains the Anita channel
+Channel: Select Anita
+
+
+
+
+🔹 Step 2: Get Message Details
+
+Add action:
+Microsoft Teams → Get message details
+Configure:
+
+Message ID: Use dynamic content:
+Message ID from the trigger
+
+
+
+
+🔹 Step 3: Post Adaptive Card and Wait for a Response
+
+Add action:
+Microsoft Teams → Post adaptive card and wait for a response
+Configure:
+
+Post as: Flow bot
+Post in: Group chat
+Group chat:  Juniors
+
+
+Thanks! We've noted you're working on this issue. 🛠️
+
+
+
+
+
+
+🔹 Step 4: Condition – Check Button Click
+
+Add action:
+Control → Condition
+Configure:
+
+Expression:
+     equals(triggerOutputs()?['body/data/action'], 'workInProgress')
+
+
+
+
+
+🔹 Step 5a: Post Follow-Up Message in Juniors Group Chat
+
+Inside the “If yes” branch, add action:
+Microsoft Teams → Post message in a chat or channel
+Configure:
+
+Post as: Flow bot
+Post in: Group chat
+Group chat: ETOC Juniors
+Message:
+
+🛠️ @{triggerOutputs()?['body/responder']['displayName']} is working on the issue.🔗 View original message?['body/webUrl']})
+
+
+
+
+🔹 Step 5b: Reply to Original Message in ita Channel
+
+Add another action inside the “If yes” branch:
+Microsoft Teams → Reply with a message in a channel
+Configure:
+
+Post as: Flow bot
+Post in: Channel
+Team: Select the team with the Anita channel
+Channel: ita
+Message ID: Use dynamic content:
+Message ID from the trigger
+Message:
+       🛠️ A technician is now working on your issue. We'll keep you updated!
+
+
+
+
+
+✅ Done!
+Your flow is now complete. It will:
+
+Detect new user issues in ita.
+Notify  Juniors with an adaptive card.
+Let techs click “Work in Progress”.
+Post a follow-up in the group chat.
+Reply to the original user message in ta.
+
