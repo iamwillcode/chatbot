@@ -292,3 +292,50 @@ Post with body only → Issue=“—”, Description=body (clean), everything el
 Post with only screenshot → Issue=“—”, Description=“(no message text)”, Screenshot Attached?=true, Link to user message set, Card still fine.
 
 Click 🛠️ Work in Progress → Agent Name populates in the list, chat + channel notifications fire, 📝 Open List Item opens the list form.
+
+
+
+Totally normal—you’re running into two common Power Automate “gotchas”:
+
+Variables don’t always appear in the Dynamic content picker, especially inside sub-fields (like a Hyperlink’s Url/Description) or inside some connectors’ property editors.
+
+Choice columns only accept one of the configured values (unless “Allow fill-in choices” is enabled). If your value isn’t in the list, the picker won’t help—and the action may fail if you pass a non-allowed value.
+
+Here’s how to wire each field right now.
+
+How to use your variables anyway (two reliable options)
+Option A — Use the Expression tab (fastest)
+
+When a field doesn’t show your variable in Dynamic content:
+
+Click into the field.
+
+Click Expression (next to Dynamic content).
+
+Type one of these exactly and click Save:
+
+Issue (text or choice):
+variables('varIssue')
+
+Description (multiline):
+variables('varDescription')
+
+Screenshot Attached? (Yes/No):
+variables('varHasAttachment')
+
+Link to user message (Url) (Hyperlink):
+variables('varMessageLink')
+
+For the Hyperlink Description sub-box, just type a literal like Open Teams message (no expression needed).
+
+Option B — Surface them via Compose (so they appear in Dynamic content)
+
+Add three quick Compose actions right before Create item:
+
+Compose — IssueForList → Expression: variables('varIssue')
+
+Compose — DescriptionForList → Expression: variables('varDescription')
+
+Compose — HasAttachmentForList → Expression: variables('varHasAttachment')
+
+Then in Create item, pick Outputs from those three Composes. These will show up in the Dynamic content panel everywhere.
