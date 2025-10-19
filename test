@@ -13,3 +13,64 @@ Resolution
 Extra Notes
 Logged on Issues Tab?
 Resolved 1st Call?
+
+
+
+
+🔁 Power Automate Flow Logic
+Trigger:
+
+When a new message is posted in the Teams channel (e.g., Anita).
+
+Steps:
+
+
+Check for attachments
+
+If the message contains an image:
+
+Save it to a SharePoint document library.
+Get a shareable link.
+Set Screenshot Attached? = Yes
+Add the link to the Screenshot column.
+
+
+If no image:
+
+Set Screenshot Attached? = No
+
+
+
+
+
+Create a new item in the Microsoft List
+
+Fill in: Affected User Name, Description, Screenshot link, Screenshot Attached?, Date Reported, etc.
+
+
+
+Send Adaptive Card to Tech Support Group Chat
+
+Include:
+
+Issue summary
+Button: “Work in Progress”
+Button: “View Screenshot” (if available)
+
+
+
+
+
+When “Work in Progress” is clicked
+
+Capture the agent’s name
+Update the Agent Name column in the Microsoft List
+
+
+
+
+🧾 Adaptive Card JSON (with Screenshot Button)
+Here’s a sample Adaptive Card JSON you can use in Power Automate:
+JSON{  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",  "type": "AdaptiveCard",  "version": "1.5",  "body": [    {      "type": "TextBlock",      "text": "**New Issue Reported**",      "weight": "Bolder",      "size": "Medium"    },    {      "type": "TextBlock",      "text": "Affected User: ${AffectedUserName}",      "wrap": true    },    {      "type": "TextBlock",      "text": "Issue: ${Issue}",      "wrap": true    },    {      "type": "TextBlock",      "text": "Description: ${Description}",      "wrap": true    },    {      "type": "ActionSet",      "actions": [        {          "type": "Action.Submit",          "title": "Work in Progress",          "data": {            "action": "assignToMe",            "listItemId": "${ListItemID}"          }        },        {          "type": "Action.OpenUrl",          "title": "View Screenshot",          "url": "${ScreenshotURL}"        }      ]    }  ]}Show more lines
+
+Replace ${AffectedUserName}, ${Issue}, ${Description}, ${ScreenshotURL}, and ${ListItemID} with dynamic content from your flow.
