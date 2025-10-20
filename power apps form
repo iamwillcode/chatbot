@@ -1,0 +1,192 @@
+1) Turn your list form into a Power Apps form
+
+Open your Combined Log list in SharePoint.
+
+Top bar → Integrate → Power Apps → Customize forms.
+Power Apps opens with a form connected to Combined Log.
+
+In the left tree, select SharePointForm1 (that’s the default edit/display form).
+
+Publish later in step 6.
+
+2) Show the right fields & order them
+
+In the right pane (Fields), Add and Reorder:
+
+Affected User Name (Text)
+
+Microsoft Ticket (Text)
+
+Agent Name (Person)
+
+Date Reported (Date/Time)
+
+Issue (Choice/Text)
+
+Description (Multiline)
+
+Attachments (very important—lets techs add screenshots)
+
+Screenshot (Hyperlink) (optional to display; attachments usually cover uploads)
+
+Screenshot Attached? (Yes/No)
+
+Resolution (Multiline)
+
+Extra Notes (Multiline)
+
+Logged on Issues Tab? (Yes/No)
+
+Resolved 1st Call? (Yes/No)
+
+Link to user message (Hyperlink)
+
+To add Attachments if it’s not visible: click + Add field, choose Attachments.
+
+3) Make it friendly (visibility, defaults, & validation)
+
+Select each DataCard and set properties (top-left dropdown → DataCard).
+
+3.1 Required rules
+
+Issue required:
+
+Select Issue_DataCard → Required: true
+
+Description required:
+
+Description_DataCard → Required: true
+
+3.2 Conditional logic
+
+If Screenshot Attached? = true, highlight attachments:
+
+Attachments_DataCard → Visible: true
+
+Attachments_DataCard → BorderColor:
+
+If( ThisItem.'Screenshot Attached?', ColorValue("#ff9800"), RGBA(0,0,0,0) )
+
+
+If Resolved 1st Call? = true, Resolution_DataCard → Required:
+
+ThisItem.'Resolved 1st Call?'
+
+
+(Or show a banner label with a reminder:
+
+"Please add Resolution when 'Resolved 1st Call?' is Yes."
+
+
+and set Visible to the same condition.)
+
+3.3 Helpful defaults (optional)
+
+These don’t override existing values—only help new records (you’re editing after creation, so mostly informational):
+
+Date Reported → Default:
+
+If( IsBlank(Parent.Default), Now(), Parent.Default )
+
+3.4 Lock/unlock cards to edit inner controls
+
+Select a DataCard → Unlock (if needed) to edit Default/Update/DisplayMode of inner controls.
+
+Keep Update as the inner control’s Text (or Selected for choice/person), e.g.:
+
+Text fields: DataCardValue_Issue.Text
+
+Yes/No: DataCardValue_SAAttch.Value
+
+Person: keep default binding—Power Apps handles it.
+
+4) Attachments for screenshots
+
+The Attachments control lets techs browse or drag/drop image files.
+
+Screenshots become list attachments (which is fine for Option 1).
+
+If you also want to display the Screenshot (Hyperlink) field:
+
+Add a label below:
+Text:
+
+If( IsBlank( ThisItem.Screenshot.Value ), "No screenshot link", "Screenshot link added" )
+
+
+Or add a Launch icon with OnSelect:
+
+If( !IsBlank( ThisItem.Screenshot.Value ), Launch( ThisItem.Screenshot.Value ) )
+
+5) Layout & polish (quick wins)
+
+Use Containers → Vertical container to group fields (Issue/Description together, Resolution/Notes together).
+
+Add a small Label at the top showing the Teams link:
+
+Text: "🔗 Open Teams message"
+
+OnSelect (set DisplayMode = View, and OnSelect to launch):
+
+If( !IsBlank(ThisItem.'Link to user message'.Value), Launch(ThisItem.'Link to user message'.Value) )
+
+
+Add a banner label at top:
+
+Text:
+
+Concatenate("Affected User: ", Coalesce(ThisItem.'Affected User Name', ""))
+
+6) Publish & use
+
+File → Save → Publish to SharePoint → Publish.
+
+Back in SharePoint, open any item → you’ll see your Power Apps form.
+
+Your Adaptive Card “📝 Open List Item” button doesn’t change:
+
+It already links to:
+…/Lists/Combined%20Log/EditForm.aspx?ID=<ID>
+
+That now opens the Power Apps form automatically.
+
+7) Flow: no change needed (verify the link)
+
+In your flow’s Compose — ListItemUrl, keep:
+
+concat(
+  variables('varSiteUrl'),
+  '/Lists/Combined%20Log/EditForm.aspx?ID=',
+  variables('varListItemId')
+)
+
+
+The Adaptive Card 📝 Open List Item points here.
+
+Techs edit and Submit—the list updates instantly.
+
+8) Permissions (don’t skip)
+
+Make sure the support team has at least Contribute to:
+
+Combined Log list (to edit)
+
+(Optional) any associated document library if you also link to uploaded files elsewhere.
+
+9) Quick test plan (5 minutes)
+
+Post in Teams (with/without attachments).
+
+Flow creates list item and posts Adaptive Card.
+
+Click 📝 Open List Item → Power Apps form opens.
+
+Add a screenshot via Attachments, fill Resolution and Extra Notes, toggle Screenshot Attached? as needed.
+
+Click Save → confirm list item updated.
+
+Click 🛠️ Work in Progress in the card → confirm Agent Name fills in the list; chat and channel notifications land.
+
+Later: switch to a full app (no URL change)
+
+When you want a richer experience, you can still move to a standalone Power Apps app and change only the ListItemUrl in your flow to the app’s deep link (…/play/appId/...&ID=<ID>). Everything else stays the same.
