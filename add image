@@ -168,3 +168,52 @@ Image didn’t save: Verify screenshot_DataCard.Update exactly as above, and tha
 Editing existing item shows old image: That’s correct if you didn’t pick a new one. Use the Remove flow (toggle/button) to clear, then submit.
 
 Multiple screenshots: The Image column stores one picture. Keep Attachments for additional images; or add screenshot_2 (another Image column) if you want a second primary image.
+
+
+
+
+Do this (works 100% even when “Update” is hidden)
+
+Confirm control names
+
+Your form is likely SharePointForm1.
+
+Your Add Picture control is whatever you named it (e.g., AddPic_Screenshot). If you haven’t added it yet: Insert → Media → Add picture; put it inside the screenshot card.
+
+Put this in the form’s OnSuccess
+
+Select the form (click the gray border until the property dropdown shows SharePointForm1).
+
+In the top-left property dropdown, pick OnSuccess.
+
+Paste this formula:
+
+// After SubmitForm succeeds, push the chosen image into the Image column
+If(
+    !IsBlank(AddPic_Screenshot.Media),
+    Patch(
+        'Combined Log',
+        If(
+            !IsBlank(SharePointForm1.LastSubmit),
+            SharePointForm1.LastSubmit,
+            LookUp('Combined Log', ID = SharePointIntegration.SelectedListItemID)
+        ),
+        { screenshot: AddPic_Screenshot.Media }
+    )
+);
+
+// optional tidy-up
+Reset(AddPic_Screenshot);
+RequestHide()
+
+
+If your Add Picture control has a different name, replace AddPic_Screenshot accordingly.
+
+Make sure SubmitForm is being called
+
+If you rely on the built-in SharePoint “Save” button, it already calls SubmitForm(SharePointForm1) → your OnSuccess runs automatically.
+
+If you added your own button, set OnSelect to:
+
+If(SharePointForm1.Valid, SubmitForm(SharePointForm1), Notify("Please fill required fields.", NotificationType.Warning))
+
