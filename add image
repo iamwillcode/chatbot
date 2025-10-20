@@ -1,0 +1,170 @@
+) Prep: confirm the column
+
+In your Combined Log list, make sure screenshot is a Column type = Image (not Hyperlink).
+
+In the list view, add the screenshot column so you’ll see the thumbnail after save.
+
+2) Open the form and unlock the card
+
+Open the customized form in Power Apps Studio.
+
+In the left tree, select the screenshot DataCard (it will be named something like screenshot_DataCard).
+
+In the right pane, click Unlock to change properties (if locked).
+
+3) Add the Add Picture control and map it
+
+Insert → Media → Add picture. Rename it to AddPic_Screenshot.
+
+Drag/drop AddPic_Screenshot inside screenshot_DataCard.
+
+(Optional) Add an Image control for preview and set:
+
+Image:
+
+If(
+  !IsBlank(AddPic_Screenshot.Media),
+  AddPic_Screenshot.Media,
+  ThisItem.screenshot   // shows the currently stored image when editing existing items
+)
+
+
+With the screenshot_DataCard selected, set Update to:
+
+If(
+  !IsBlank(AddPic_Screenshot.Media),
+  AddPic_Screenshot.Media,
+  Parent.Default
+)
+
+
+This means: if a new picture is chosen, save it; otherwise keep the existing image.
+
+If you want the field required, set the card’s Required to true.
+
+Tip: The Add Picture control’s AcceptedFileTypes defaults to images; you can keep it or set ["image/*"].
+
+4) Optional: “Clear/Replace image” UX
+
+Add a small “Remove Screenshot” toggle or button.
+
+A) Toggle approach
+
+Insert a Toggle named tglClearShot.
+
+Set Text = "Remove screenshot".
+
+Change screenshot_DataCard.Update to:
+
+If(
+  tglClearShot.Value,
+  Blank(),
+  If(!IsBlank(AddPic_Screenshot.Media), AddPic_Screenshot.Media, Parent.Default)
+)
+
+
+After submit (see §6), reset the toggle:
+
+Reset(tglClearShot); Reset(AddPic_Screenshot)
+
+
+B) Button approach
+
+Insert a Button “Clear”.
+
+OnSelect:
+
+Reset(AddPic_Screenshot);
+UpdateContext({ _clearShot: true });
+
+
+Modify Update similarly using _clearShot flag.
+
+5) Keep the Attachments control (optional)
+
+If you still want other files (logs, PDFs, extra images) as list attachments:
+
+Leave the Attachments DataCard in the form.
+
+It’s separate from the screenshot Image column, so both can coexist:
+
+Primary screenshot → screenshot (thumbnail in list)
+
+Additional files → Attachments
+
+6) Submit/save behavior
+
+You can rely on SharePoint’s built-in Save button, or add your own:
+
+Submit button (your own)
+
+Insert → Button → Text: "Submit".
+
+OnSelect:
+
+If(
+  SharePointForm1.Valid,
+  SubmitForm(SharePointForm1),
+  Notify("Please fill in all required fields.", NotificationType.Warning)
+)
+
+
+Form success (optional tidy-up)
+
+SharePointForm1.OnSuccess:
+
+ResetForm(SharePointForm1);
+RequestHide(); // closes the form in SharePoint
+
+7) Nice-to-haves (validation & hints)
+
+Make screenshot required only in certain cases (e.g., when “Screenshot Attached?” = true):
+
+screenshot_DataCard.Required:
+
+ThisItem.'Screenshot Attached?'
+
+
+Show a hint when no image is present:
+
+Add a Label under the preview:
+
+Text:
+
+If(
+  IsBlank(AddPic_Screenshot.Media) && IsBlank(ThisItem.screenshot),
+  "No screenshot yet — click or drag a file above.",
+  ""
+)
+
+
+Limit file size (SharePoint limits apply; typical max 10–15 MB for images). You can guard:
+
+AddPic_Screenshot OnAddFile:
+
+If(
+  AddPic_Screenshot.AddedFiles[0].Size > 10*1024*1024,
+  Notify("Image too large (max 10 MB).", NotificationType.Error);
+  Reset(AddPic_Screenshot)
+)
+
+8) Publish and test
+
+File → Save → Publish to SharePoint → Publish.
+
+From your Adaptive Card, click 📝 Open List Item (EditForm.aspx?ID=…).
+
+Use Add picture to pick a screenshot, Submit.
+
+Back in the list grid, confirm the screenshot column shows a thumbnail.
+(If you don’t see it, add the column to your current view.)
+
+Quick Troubleshooting
+
+No thumbnail in list: Ensure you updated the Image column (screenshot) — not just Attachments or a Hyperlink column. Confirm the view displays screenshot.
+
+Image didn’t save: Verify screenshot_DataCard.Update exactly as above, and that AddPic_Screenshot sits inside the card.
+
+Editing existing item shows old image: That’s correct if you didn’t pick a new one. Use the Remove flow (toggle/button) to clear, then submit.
+
+Multiple screenshots: The Image column stores one picture. Keep Attachments for additional images; or add screenshot_2 (another Image column) if you want a second primary image.
