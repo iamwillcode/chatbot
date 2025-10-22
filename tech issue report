@@ -1,0 +1,305 @@
+A) SharePoint list (new)
+
+Create a list (e.g., Channel Issues (Weekly)) with these columns:
+
+Affected user name — Single line of text
+
+User UPN — Single line of text
+
+Agent Name — Person or Group (single selection)
+
+Issue — Multiple lines of text
+
+Date reported — Date and Time (Include time)
+
+Link to user message — Hyperlink (show as hyperlink)
+
+(You can add more later; these are the ones your team asked for.)
+
+B) Power Automate — Flow (Teams → SharePoint → Adaptive Card)
+0) Trigger
+
+Microsoft Teams → When a new channel message is added (V3)
+
+Team: (the team with the user-facing channel)
+
+Channel: (e.g., Anita)
+
+1) Initialize variables
+
+Add 6 Initialize variable actions:
+
+varMessageLink — String — (blank)
+
+varAffectedUser — String — (blank)
+
+varAffectedUserUPN — String — (blank)
+
+varIssueText — String — (blank)
+
+varListItemId — String — (blank)
+
+varWithinWindow — Boolean — false
+
+2) Get message details
+
+Microsoft Teams → Get message details (V3)
+
+Message ID: Message ID (from trigger)
+
+Team/Channel: same as trigger
+
+Then:
+
+Set variable varMessageLink = Link to message (from Get message details)
+
+Set variable varAffectedUser = From Display Name (from Get message details)
+
+3) Extract the poster’s UPN (User UPN)
+
+Try direct (many tenants expose it):
+
+Set variable varAffectedUserUPN = Expression
+
+outputs('Get_message_details_(V3)')?['from']?['user']?['userPrincipalName']
+
+
+If that returns blank in your run history, add:
+
+Office 365 Users → Search for users (V2)
+
+Search term: From Display Name (from Get message details)
+
+Condition: if length(body('Search_for_users_(V2)')?['value']) > 0
+
+True → Set variable varAffectedUserUPN =
+
+first(body('Search_for_users_(V2)')?['value'])?['userPrincipalName']
+
+
+False → leave as blank
+
+(Office 365 Users is a standard connector.)
+
+4) Build the Issue text (message body → clean fallback)
+
+Add two Compose actions:
+
+Compose — RawBody = Body (from Get message details)
+
+Compose — IssueText (Expression):
+
+if(
+  not(empty(outputs('Compose_-_RawBody'))),
+  outputs('Compose_-_RawBody'),
+  '(no message text)'
+)
+
+
+Then Set variable varIssueText = Outputs of Compose — IssueText.
+
+If your message body includes <br> and HTML, you can lightly clean it with:
+
+replace(replace(outputs('Compose_-_IssueText'),'<br>','\n'),'<br/>','\n')
+
+5) Respect your weekly window (Saturday 12:00 AM → Friday 11:59 PM, Toronto)
+
+We’ll calculate the current week’s start (Saturday 00:00) and ensure the message timestamp falls within [weekStart, weekStart+7d) in America/Toronto.
+
+Add three Compose actions:
+
+Compose — LocalNow (Expression):
+
+convertTimeZone(utcNow(),'UTC','Eastern Standard Time')
+
+
+Compose — WeekStartLocal (Expression):
+
+addDays(
+  startOfDay(outputs('Compose_-_LocalNow')),
+  -mod(add(dayOfWeek(outputs('Compose_-_LocalNow')),1),7)
+)
+
+
+(This backs up to the most recent Saturday 00:00.)
+
+Compose — CreatedLocal (Expression):
+
+convertTimeZone(triggerOutputs()?['body/createdDateTime'],'UTC','Eastern Standard Time')
+
+
+Now add a Condition (single Expression) to set the flag:
+
+and(
+  greaterOrEquals(outputs('Compose_-_CreatedLocal'), outputs('Compose_-_WeekStartLocal')),
+  less(outputs('Compose_-_CreatedLocal'), addDays(outputs('Compose_-_WeekStartLocal'),7))
+)
+
+
+True → Set variable varWithinWindow = true
+
+False → (do nothing)
+
+Add another Condition to exit early if outside window:
+
+Expression: equals(variables('varWithinWindow'), true)
+
+True → continue
+
+False → Terminate (Status = Succeeded; Message = “Outside weekly window”)
+
+That implements your “run from Saturday midnight to Friday 11:59 PM” requirement using the message’s timestamp in the Toronto timezone.
+
+6) Create the SharePoint list item
+
+SharePoint → Create item
+
+Site: your site
+
+List: your new list
+
+Map fields:
+
+Affected user name → variables('varAffectedUser')
+
+User UPN → variables('varAffectedUserUPN')
+
+Issue → variables('varIssueText')
+
+Date reported → Expression convertTimeZone(triggerOutputs()?['body/createdDateTime'],'UTC','Eastern Standard Time')
+
+Link to user message (Hyperlink) →
+
+Url = variables('varMessageLink')
+
+Description = Open Teams message
+
+Agent Name → (leave blank here; we’ll set it when a tech clicks the button)
+
+Then Set variable varListItemId = ID (from Create item).
+
+7) Post the Adaptive Card to your support chat (and wait)
+
+We’ll send a simple card (v1.4) with View message, Open List Item, and Work in Progress. If your action only shows a single Message box, use an Expression that builds JSON.
+
+Compose — ListItemUrl (Expression):
+
+concat('https://<yourtenant>.sharepoint.com/sites/<YourSite>',
+       '/Lists/Channel%20Issues%20(Weekly)/EditForm.aspx?ID=',
+       variables('varListItemId'))
+
+
+(Adjust the site and list path; URL-encode spaces with %20.)
+
+Microsoft Teams → Post adaptive card and wait for a response
+
+Post as: Flow bot
+
+Post in: Group chat: (your tech support chat)
+
+Message (Expression, safe v1.4 minimal card):
+
+concat(
+'{',
+'"$schema":"http://adaptivecards.io/schemas/adaptive-card.json",',
+'"type":"AdaptiveCard","version":"1.4",',
+'"body":[',
+  '{ "type":"TextBlock","text":"New channel issue","weight":"Bolder","size":"Medium" },',
+  '{ "type":"TextBlock","text":"From: ', variables('varAffectedUser') , '","wrap":true },',
+  '{ "type":"TextBlock","text":"Issue:","weight":"Bolder" },',
+  '{ "type":"TextBlock","text":"', replace(variables('varIssueText'),'"','\"') , '","wrap":true }',
+'],',
+'"actions":[',
+  '{ "type":"Action.OpenUrl","title":"🔗 View message","url":"', variables('varMessageLink') ,'" },',
+  '{ "type":"Action.OpenUrl","title":"📝 Open List Item","url":"', outputs('Compose_-_ListItemUrl') ,'" },',
+  '{ "type":"Action.Submit","title":"🛠️ Work in Progress","data":{"action":"assignToMe","listItemId":"', variables('varListItemId') ,'"} }',
+']',
+'}'
+)
+
+
+If you see “invalid card”, double-check quotes and your step names. You can also build the card in a Compose and set Message = Outputs.
+
+8) On click → set Agent Name automatically + notify
+
+Rename the Adaptive Card step to Post_card_Support (… → Rename) to make expressions tidy.
+
+Add a Condition (Expression):
+
+equals(
+  coalesce(
+    outputs('Post_card_Support')?['body']?['data']?['action'],
+    outputs('Post_card_Support')?['data']?['action'],
+    outputs('Post_card_Support')?['body']?['submitActionId'],
+    outputs('Post_card_Support')?['submitActionId']
+  ),
+  'assignToMe'
+)
+
+
+True branch:
+
+SharePoint → Update item
+
+ID: variables('varListItemId')
+
+Agent Name (Person) = Expression (claims):
+
+concat(
+  'i:0#.f|membership|',
+  outputs('Post_card_Support')?['body']?['responder']?['userPrincipalName']
+)
+
+
+(If your tenant accepts UPN directly for Person: use the UPN path without the concat.)
+
+Teams → Post message (support chat):
+
+🛠️ @{outputs('Post_card_Support')?['body']?['responder']?['displayName']} is working on the issue.
+🔗 Original: @{variables('varMessageLink')}
+
+
+Teams → Reply with a message in the channel (Message ID from trigger):
+
+🛠️ A technician is now working on your issue. We’ll keep you updated!
+
+
+False branch: do nothing.
+
+That last question you asked
+
+“Can this automation automatically capture the agent that worked on the issue name?”
+
+✅ Yes. That’s exactly what Step 8 does. When a tech clicks “Work in Progress” on the Adaptive Card, the flow records that tech’s display name/UPN into the Agent Name (Person) column for that list item.
+
+C) Quick test plan (5 minutes)
+
+Post a test message in the channel (with text).
+
+Flow creates a row in your new list with:
+
+Affected user name — filled
+
+User UPN — filled (or blank if directory didn’t return; see step 3 above)
+
+Issue — the message text
+
+Date reported — the message’s timestamp (Toronto)
+
+Link to user message — the Teams deep link
+
+Card lands in your tech chat with View message, Open List Item, Work in Progress.
+
+Click Work in Progress → Agent Name fills on the list; notifications post.
+
+Troubleshooting cheatsheet
+
+Create item fails → a column type mismatch (e.g., Issue must be text/multiline).
+
+UPN blank → your tenant’s Teams payload didn’t include it; keep the Office 365 Users fallback.
+
+Card click not detected → ensure the action is Post adaptive card and wait for a response, version 1.4 in JSON, and your Condition uses the coalesce(...) path above.
+
+Window filter wrong → open a run and check the three composes (LocalNow, WeekStartLocal, CreatedLocal) to confirm values; adjust timezone if needed.
+
+If you paste your site URL and the exact list name you used, I can give you the precise ListItemUrl expression (with the right %20 encodes) so you can paste it as-is.
